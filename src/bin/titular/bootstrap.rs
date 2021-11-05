@@ -16,12 +16,13 @@ static DEFAULT_CONF: &str = "[defaults]\n\
                             width = \"full\"\n\
                             surround_start = \"[\"\n\
                             surround_end = \"]\"\n\n\
-                            [colours]\n\
+                            [vars]\n\
                             steel_blue   = \"RGB(70, 130, 180)\"\n\
-                            light_purple = \"FIXED(134\"\n\
+                            light_purple = \"FIXED(134)\"\n\
                             red          = \"NAME(Red)\"\n\
                             green        = \"NAME(Green)\"\n\
-                            yellow       = \"NAME(Yellow)\"\n\n\
+                            yellow       = \"NAME(Yellow)\"\n
+                            space        = \" \"\n\n\
                             [templates]\n\
                             directory = \"$HOME/.config/titular/templates\"\n\
                             default = \"Basic\"\n";

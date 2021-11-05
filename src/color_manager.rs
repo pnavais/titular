@@ -44,7 +44,7 @@ impl ColorManager {
                         None
                     }
                 } else {
-                    None
+                    ColorManager::get_style(colours, c)
                 }
             },
             None => None

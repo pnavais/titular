@@ -10,12 +10,11 @@ use crate::{
 use std::collections::VecDeque;
 use truncrate::*;
 use regex::Regex;
-use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref VAR_REGEX: Regex = Regex::new("([\\$|\\#])\\{([^}]+)\\}").unwrap();
+    static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
     static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^-]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
@@ -24,7 +23,7 @@ lazy_static! {
 #[derive(Debug)]
 struct VarContent<'a> {
     item: &'a str,    
-    surround: bool,
+    surround: char,    
     is_filler: bool,
     transforms: VecDeque<Transform<'a>>,
 }
@@ -76,13 +75,12 @@ impl<'a> TemplateFormatter<'a> {
         let mut line = pattern.to_owned();
         
         // Compute max padding left
-        let fixed_length = VAR_REGEX.replace_all(pattern, "").graphemes(true).count();
+        let fixed_length = VAR_REGEX.replace_all(pattern, "").width();
         let mut space_left = max_term_size - fixed_length;
 
         // Resolve normal groups
-        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left)?;
-        //space_left-=resolve_stats.current_length;
-        let max_pad_length = (max_term_size - fixed_length - resolve_stats.current_length) / resolve_stats.num_groups_pad;
+        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left)?;        
+        let max_pad_length = (max_term_size.checked_sub(fixed_length + resolve_stats.current_length)).unwrap_or(0) / std::cmp::max(resolve_stats.num_groups_pad,1);
     
         // Resolve padding groups
         self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left)?;
@@ -102,16 +100,17 @@ impl<'a> TemplateFormatter<'a> {
             let mut has_padding: bool = false;
             let var_content = VarContent {
                 item: item_name,
-                surround: group.get(1).map_or("", |m| m.as_str()) == "#",
+                surround: group.get(1).map_or('\0', |m| m.as_str().chars().next().unwrap()),
                 is_filler: FILLER_REGEX.is_match(item_name),
                 transforms: self.get_transforms(item_group, &mut has_padding),
             };
             if (!apply_padding && !has_padding) || apply_padding {
-                let item = self.format_item(context, &var_content, max_pad_length + if *space_left - (max_pad_length+1) == 0 { 1 } else { 0 });
+                let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
+                let item = self.format_item(context, &var_content, max_pad_length + excess);
                 *items = items.replace(group.get(0).map_or("", |m| m.as_str()), &item.value);
                 
                 current_length+=item.length;
-                *space_left-=item.length;
+                *space_left = *space_left - std::cmp::min(item.length, *space_left);
             }
             if has_padding {
                 num_groups_pad+=1;
@@ -145,19 +144,24 @@ impl<'a> TemplateFormatter<'a> {
 
         let mut styled_length = 0;
 
-        // Apply style
-        for transform in &var_content.transforms {            
-            styled_length = item_name.graphemes(true).count();
-            self.style(&mut item_name, transform, context, max_pad_length);
-            styled_length = item_name.graphemes(true).count() - styled_length;
-        }
-        
         // Surround
-        if var_content.surround {
+        if var_content.surround == '%' {
             self.surround(&mut item_name, context);
         }
 
-        let item_length = item_name.graphemes(true).count() - styled_length;
+        // Apply style
+        for transform in &var_content.transforms {            
+            styled_length = item_name.width();
+            self.style(&mut item_name, transform, context, max_pad_length);            
+            styled_length = item_name.width() - std::cmp::min(item_name.width(), styled_length);
+        }
+        
+        // Surround
+        if var_content.surround == '#' {
+            self.surround(&mut item_name, context);
+        }
+
+        let item_length = item_name.width() - styled_length;
         
         FormattedItem { value: item_name, length: item_length }
     }
@@ -175,7 +179,7 @@ impl<'a> TemplateFormatter<'a> {
     
     fn surround(&self, txt: &mut String, context: &'a FallbackMap<String, String>) {
         let s_start = context.get(&"surround_start".to_owned()).or(Some(&self.main_config.defaults.surround_start)).unwrap();
-        let s_end = context.get(&"surround_end".to_owned()).or(Some(&self.main_config.defaults.surround_start)).unwrap();
+        let s_end = context.get(&"surround_end".to_owned()).or(Some(&self.main_config.defaults.surround_end)).unwrap();
         if txt.len() > 0 {
             *txt = format!("{}{}{}", s_start, txt, s_end);
         }
@@ -184,7 +188,7 @@ impl<'a> TemplateFormatter<'a> {
     fn pad(&self, txt: &'a mut String, max_length: usize) -> &'a String {        
         let pattern = txt.to_owned();
 
-        while txt.graphemes(true).count() < max_length {
+        while txt.width() < max_length {
             *txt+=&pattern;            
         }
         

@@ -77,6 +77,13 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
             .long_help("Explicitly specify the width percentage (%) of the maxium width \
                         of the terminal to use (defaults to 100%).")
         )
+        .arg(
+            Arg::with_name("n")
+            .short("n")
+            .long("no-newline")            
+            .help("Supress new line after the generated title.")
+            .long_help("Prevents writing a carriage return after generating the title.")
+        )
         .subcommand(
             SubCommand::with_name("templates")
                 .about("Modify the templates configuration")         

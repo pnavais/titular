@@ -14,7 +14,7 @@ use crate:: {
 pub struct MainConfig {    
     pub defaults: Defaults,
     #[serde(default)]
-    pub colours: HashMap<String, String>,
+    pub vars: HashMap<String, String>,
     pub templates: Templates,
 }
 
@@ -56,7 +56,7 @@ impl Default for Templates {
 
 impl MapProvider<String, String> for MainConfig {    
     fn resolve(&self, key: &String) -> Option<&String> {
-        self.colours.get(key)
+        self.vars.get(key)
     }
 }
 
