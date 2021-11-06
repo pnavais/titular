@@ -39,6 +39,8 @@ impl App {
     fn run_template_subcommand(&self, controller: TemplatesController, matches: &clap::ArgMatches) -> Result<()> {
         if matches.is_present("list") {
             controller.list();
+        } else if matches.is_present("open") {
+            controller.open(matches.subcommand_matches("open").unwrap().value_of("template").unwrap())?;
         }
         Ok(())
     }

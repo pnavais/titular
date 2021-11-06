@@ -96,6 +96,20 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                             the templates directory (default: the templates folder inside configuration directory).",
                         )
                 )
+                .subcommand(
+                    SubCommand::with_name("open")
+                        .arg(Arg::with_name("template")
+                            .required(true)
+                            .takes_value(true)
+                            .help("The name of template to open")
+                            .index(1))                                            
+                        .help("Opens the selected installed template.")
+                        .about(
+                            "Opens the selected templates from \
+                            the templates directory (default: the templates folder inside configuration directory) \
+                            in the platform's default text editor.",
+                        ),
+                )
         );
 
         app

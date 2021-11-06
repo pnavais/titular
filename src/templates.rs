@@ -15,6 +15,7 @@ pub struct TemplatesController {
 }
 
 impl TemplatesController {
+
     pub fn list(&self) {        
         if Path::new(&self.input_dir).exists() {
             let templates = glob(&*format!("{}{}", self.input_dir.to_string_lossy(), "/**/*.tpl")).expect("Failed to read glob pattern");
@@ -34,13 +35,27 @@ impl TemplatesController {
         }
     }
 
+    pub fn open(&self, name: &str) ->  Result<()> {
+        let path = self.get_template_file(name);
+        let template = &self.input_dir.clone().join(&path);
+
+        if !template.exists() {
+            return Err(Error::TemplateNotFound{file: String::from(path), cause: format!("Template not found \"{}\"", Yellow.paint(template.to_string_lossy())) });
+        }
+                
+        match edit::edit_file(&template) {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
+        }
+    }
+
     
     fn parse(&self, name: &str) -> Result<TemplateConfig> {
         let path = self.get_template_file(name);
         let toml_data = match config_parse(&self.input_dir.clone().join(&path)) {
             Ok(data) => data,
             Err(Error::Io(e)) if e.kind() == ::std::io::ErrorKind::NotFound => return Err(Error::TemplateNotFound{file: String::from(path), cause: e.to_string() }),
-            Err(Error::Io(e)) => return Err(Error::TemplateReadError{file: String::from(path), cause: e.to_string() }),
+            Err(Error::Io(e)) => return Err(Error::TemplateReadError{ file: String::from(path), cause: e.to_string() }),
             Err(e) => return Err(e),
         };
 
