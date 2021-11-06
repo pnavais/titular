@@ -69,10 +69,16 @@ pub fn parse_main_config() -> Result<MainConfig> {
     };
 
     let res : std::result::Result<MainConfig, ::toml::de::Error> = toml::from_str(&toml_data);
-    let main_config = match res {
+    let mut main_config = match res {
         Ok(config) => config,
         Err(e) => return Err(Error::SerdeTomlError{location: ConfigType::MAIN, file: String::from(DEFAULT_CONF_FILE), cause: e.to_string()}),
-    };        
+    };
+    
+    // Keep defaults as vars
+    main_config.vars.insert("defaults.fill_char".to_owned(), main_config.defaults.fill_char.to_owned());
+    main_config.vars.insert("defaults.width".to_owned(), main_config.defaults.width.to_owned());
+    main_config.vars.insert("defaults.surround_start".to_owned(), main_config.defaults.surround_start.to_owned());
+    main_config.vars.insert("defaults.surround_end".to_owned(), main_config.defaults.surround_end.to_owned());
 
     Ok(main_config)
 }

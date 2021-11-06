@@ -6,3 +6,4 @@ pub mod formatter;
 pub mod context;
 pub mod color_manager;
 pub mod fallback_map;
+pub mod styler;

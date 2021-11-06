@@ -23,7 +23,10 @@ impl Context {
     pub fn insert<S: AsRef<str>>(&mut self, key: S, value: S) {
         self.context.insert(String::from(key.as_ref()), ContextValue::String(String::from(value.as_ref())));
     }
-
+    
+    pub fn contains<S: AsRef<str>>(&self, name: S) -> bool {
+        self.context.contains_key(name.as_ref())
+    }
 
     pub fn get<S: AsRef<str>>(&self, name: S) -> Option<&String> {
         match self.context.get(name.as_ref()) {
@@ -61,7 +64,11 @@ impl Context {
     }
 }
 
-impl MapProvider<String, String> for Context {    
+impl MapProvider<String, String> for Context {
+    fn contains(&self, key: &String) -> bool {
+        self.context.contains_key(key)
+    }
+    
     fn resolve(&self, key: &String) -> Option<&String> {
         self.get(key)
     }

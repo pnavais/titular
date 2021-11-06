@@ -1,5 +1,6 @@
 
 pub trait MapProvider<K,V> {
+    fn contains(&self, key: &K) -> bool;
     fn resolve(&self, key: &K) -> Option<&V>;
 }
 
@@ -28,6 +29,15 @@ impl <'a, K,V> FallbackMap<'a, K,V> {
             if value.is_some() { break; }
         }
         value
+    }
+
+    pub fn contains(&self, key: &K) -> bool {
+        let mut res = false;
+        for map in &self.maps {
+            if map.contains(key) { res = true; break; }
+        }
+
+        res
     }
     
 }

@@ -44,7 +44,7 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                 .help("Sets the message in the title used.")
                 .long_help("Explicitly sets the text messages to use in the pattern. \
                     When specifying multiple text options, \
-                    the texts will be replaced following the same occurrence order.")
+                    the texts will be replaced following the same occurrence order (m2, m3, ...).")
         )
         .arg(
             Arg::with_name("filler")
@@ -56,7 +56,7 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
             .long_help("Explicitly specify the filler characters to use in the pattern. \
                         If not specified, the default filler specified in the pattern will be used. \
                         When specifying multiple filler options, \
-                        the latter will be assigned following the same occurrence order (f1, f2, ...).")
+                        the latter will be assigned following the same occurrence order (f2, f3, ...).")
         )
         .arg(
             Arg::with_name("key=value")

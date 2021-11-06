@@ -67,6 +67,9 @@ impl App {
         if self.matches.is_present("width") {
             context.insert("width", self.matches.value_of("width").unwrap());
         }
+        if self.matches.is_present("n") {            
+            context.insert("skip-newline", "true");
+        }
         
         Ok(context)
     }

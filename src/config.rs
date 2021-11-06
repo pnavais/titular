@@ -55,9 +55,13 @@ impl Default for Templates {
 }
 
 impl MapProvider<String, String> for MainConfig {    
+    fn contains(&self, key: &String) -> bool {
+        self.vars.contains_key(key)
+    }
+
     fn resolve(&self, key: &String) -> Option<&String> {
         self.vars.get(key)
-    }
+    }    
 }
 
 #[derive(Deserialize, Debug)]
@@ -84,7 +88,11 @@ pub struct Pattern {
     pub data: String,
 }
 
-impl MapProvider<String, String> for TemplateConfig {    
+impl MapProvider<String, String> for TemplateConfig {
+    fn contains(&self, key: &String) -> bool {
+        self.vars.contains_key(key)
+    }
+
     fn resolve(&self, key: &String) -> Option<&String> {
         self.vars.get(key)
     }
