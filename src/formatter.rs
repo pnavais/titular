@@ -157,7 +157,6 @@ impl<'a> TemplateFormatter<'a> {
             ItemStyler::surround(&mut item_name, context);
         }
 
-        //println!("WIZ DE MIERDA {} ({}) y el excess lenz = {}", item_name.width(), item_name, excess_length);
         let item_length = item_name.width() - excess_length;
         
         FormattedItem { value: item_name, length: item_length }
