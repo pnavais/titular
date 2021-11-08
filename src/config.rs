@@ -21,6 +21,9 @@ pub struct MainConfig {
 #[derive(Deserialize, Debug)]
 #[serde(default)]
 pub struct Defaults {    
+    pub username: String,
+    pub templates_url: String,
+    pub templates_repo: String,
     pub fill_char: String,    
     pub width: String,
     pub surround_start: String,
@@ -30,6 +33,9 @@ pub struct Defaults {
 impl Default for Defaults {
     fn default() -> Defaults {
         Defaults {
+            username: whoami::username(),
+            templates_url: format!("{}/{}", "https://github.com", whoami::username()),
+            templates_repo: "https://github.com/pnavais/titular/templates".to_string(),
             fill_char: "*".to_string(),
             width: "full".to_string(),
             surround_start: "[".to_string(),

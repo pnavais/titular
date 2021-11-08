@@ -41,7 +41,12 @@ impl App {
             controller.list();
         } else if matches.is_present("open") {
             controller.open(matches.subcommand_matches("open").unwrap().value_of("template").unwrap())?;
+        } else if matches.is_present("create") {
+            controller.create(matches.subcommand_matches("create").unwrap().value_of("template").unwrap())?;
+        } else if matches.is_present("remove") {
+            controller.remove(matches.subcommand_matches("remove").unwrap().value_of("template").unwrap())?;
         }
+
         Ok(())
     }
 
@@ -79,7 +84,7 @@ impl App {
     pub fn start(&self) -> Result<bool> {        
         // Parse the default config
         let bootstrap = BootStrap::new()?;
-        let controller = TemplatesController {input_dir:  bootstrap.template_dir()?};
+        let controller = TemplatesController { input_dir:  bootstrap.template_dir()?, config: &bootstrap.get_config() };
         
         match self.matches.subcommand() {
             ("templates", Some(tpl_params)) => {

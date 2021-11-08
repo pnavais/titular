@@ -1,6 +1,9 @@
+use std::io::{stdin, stdout, Write};
+
 use glob::glob;
 use std::path::{Path, PathBuf};
-use ansi_term::Colour::{ Red, Yellow };
+use ansi_term::Colour::{ Red, Yellow, Green };
+
 use crate:: {
     config::{MainConfig, TemplateConfig, parse as config_parse},
     error::*,
@@ -8,13 +11,14 @@ use crate:: {
     context::Context,
 };
 
-static DEFAULT_EXT: &str = "tpl";
+static DEFAULT_EXT: &str = ".tpl";
 
-pub struct TemplatesController {
+pub struct TemplatesController<'a> {
     pub input_dir: PathBuf,
+    pub config: &'a MainConfig,
 }
 
-impl TemplatesController {
+impl <'a> TemplatesController<'a> {
 
     pub fn list(&self) {        
         if Path::new(&self.input_dir).exists() {
@@ -35,20 +39,54 @@ impl TemplatesController {
         }
     }
 
-    pub fn open(&self, name: &str) ->  Result<()> {
-        let path = self.get_template_file(name);
-        let template = &self.input_dir.clone().join(&path);
-
-        if !template.exists() {
-            return Err(Error::TemplateNotFound{file: String::from(path), cause: format!("Template not found \"{}\"", Yellow.paint(template.to_string_lossy())) });
+    pub fn create(&self, name: &str) ->  Result<()> {
+        let (_, _, created) = self.create_new_template(name, false)?;
+        if created {
+            println!("New template \"{}\" created", Green.paint(name));
+        } else {
+            println!("{}", Yellow.paint(format!("Template \"{}\" already exists", name)));
         }
-                
-        match edit::edit_file(&template) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
+        Ok(())
+    }
+
+    pub fn open(&self, name: &str) ->  Result<()> {
+        let (path, template, _) = self.create_new_template(name, true)?;
+        
+        if !path.is_empty() {
+            match edit::edit_file(&template) {
+                Ok(_) => Ok(()),
+                Err(e) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
+            }
+        } else {
+            Ok(())
         }
     }
 
+    pub fn remove(&self, name: &str) ->  Result<()> {
+        let path = self.get_template_file(name);
+        let template = self.input_dir.clone().join(&path);
+
+        if template.exists() {
+            match std::fs::remove_file(template) {
+                Ok(_) => println!("Template \"{}\" removed", Green.paint(name)),
+                Err(e) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
+            }
+        } else {
+            println!("{}", Yellow.paint(format!("Template \"{}\" not found", name)));
+        }
+
+        Ok(())
+    }
+    
+    pub fn format(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {        
+        let template_config = self.parse(template_name)?;
+        TemplateFormatter::new(&main_config).format(&context, &template_config)
+    }
+
+    fn get_template_file(&self, name: &str) -> String {
+        let file_name = String::from(name).to_lowercase();
+        if name.ends_with(DEFAULT_EXT) { file_name } else { file_name + DEFAULT_EXT }
+    }
     
     fn parse(&self, name: &str) -> Result<TemplateConfig> {
         let path = self.get_template_file(name);
@@ -68,12 +106,82 @@ impl TemplatesController {
         Ok(template_config)
     }
 
-    pub fn get_template_file(&self, name: &str) -> String {
-        String::from(name).to_lowercase() + "." + DEFAULT_EXT        
+    fn create_new_template(&self, name: &str, prompt_user: bool) -> Result<(String, PathBuf, bool)> {
+        let path = self.get_template_file(name);
+        let template = self.input_dir.clone().join(&path);
+
+        let mut template_created = false;
+
+        if !template.exists() {
+            if prompt_user {
+                loop {         
+                    let mut input = String::new();
+                    print!("Template \"{}\" not found. Do you want to create it ? [Y/n] : ", Yellow.paint(name));
+                    let _ = stdout().flush();
+                    stdin().read_line(&mut input).expect("error: unable to read user input");
+                    input = input.trim().to_lowercase();
+                    if input == "y" || input == "yes" || input.len() <= 0 {
+                        break;
+                    } else if input == "n" || input == "no" {
+                        return Ok(("".to_owned(), PathBuf::new(), false));
+                    }
+                }
+            }
+            TemplateWriter::write_new(&template, self.config)?;
+            template_created = true;
+        }
+        Ok((path, template, template_created))
     }
+
+}
+
+static DEFAULT_TEMPLATE: &str  = "[details]\n\
+                                name    = \"@name\"\n\
+                                version = \"1.0\"\n\
+                                author  = \"@author\"\n\
+                                url     = \"@url\"\n\n\
+                                [vars]\n\
+                                f  = \"*\"\n\
+                                my_var = \"Hello\"\n\
+                                my_color = \"green\"\n\n\
+                                [pattern]\n\
+                                data = \"${f:fg[cl]:pad}${my_var:fg[my_color]+[ ]}${m:fg[my_color]}${f:fg[cr]:pad}\"\n";
+
+struct TemplateWriter {}
+
+impl TemplateWriter {
     
-    pub fn format<'a>(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {        
-        let template_config = self.parse(template_name)?;
-        TemplateFormatter::new(&main_config).format(&context, &template_config)
+    fn write_new(file_path: &PathBuf, config: &MainConfig) -> Result<()> {        
+        let file_name = TemplateWriter::get_template_name(&file_path);
+        let mut template = DEFAULT_TEMPLATE.replacen("@name", &file_name, 1);
+        
+        let author = match config.vars.get(&"username".to_owned()) {
+            Some(u) => u.to_owned(),
+            None => config.defaults.username.to_owned(),
+        };
+
+        let url = match config.vars.get(&"template_url".to_owned()) {
+            Some(u) => u.to_owned(),
+            None => config.defaults.templates_url.to_owned(),
+        };
+
+        template = template.replacen("@author", &author, 1);
+        template = template.replacen("@url", &url, 1);
+        match std::fs::write(file_path, template) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::TemplateWriteError(format!("Cannot write file {} -> {}", file_path.to_string_lossy(), e))),
+        }
+    }
+
+    fn get_template_name(file_path: &PathBuf) -> String {
+        let file_name = file_path.file_name().map_or("@file_name".to_string(), |m| { 
+            m.to_string_lossy().as_ref().replacen(&format!("{}{}", ".", DEFAULT_EXT),  "", 1).to_owned() 
+        });        
+
+        let mut c = file_name.chars();
+        match c.next() {
+            None => file_name,
+            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        }
     }
 }

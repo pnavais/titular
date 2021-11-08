@@ -90,11 +90,28 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(              
                     SubCommand::with_name("list")
+                        .alias("ls")
                         .help("List the current installed templates.")                        
                         .about(
                             "Displays the currently installed templates from \
                             the templates directory (default: the templates folder inside configuration directory).",
                         )
+                )
+                .subcommand(
+                    SubCommand::with_name("create")
+                        .alias("new")                      
+                        .arg(Arg::with_name("template")
+                            .required(true)
+                            .takes_value(true)
+                            .help("The name of template to create")
+                            .index(1))                                            
+                        .help("Creates a new template with the given name.")
+                        .about(
+                            "Creates the given template in \
+                            the templates directory (default: the templates folder inside configuration directory).\
+                            The template will be created using the default \
+                            template structure.",
+                        ),
                 )
                 .subcommand(
                     SubCommand::with_name("open")
@@ -107,7 +124,22 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                         .about(
                             "Opens the selected templates from \
                             the templates directory (default: the templates folder inside configuration directory) \
-                            in the platform's default text editor.",
+                            in the platform's default text editor. If the template does not exist the user is prompted \
+                            to create a new one using a default template structure.",
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("remove")
+                        .alias("rm")
+                        .arg(Arg::with_name("template")
+                            .required(true)
+                            .takes_value(true)
+                            .help("The name of template to remove")
+                            .index(1))                                            
+                        .help("Removes the template with the given name.")
+                        .about(
+                            "Removes the given template in \
+                            the templates directory (default: the templates folder inside configuration directory).",
                         ),
                 )
         );

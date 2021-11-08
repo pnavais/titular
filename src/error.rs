@@ -42,6 +42,8 @@ pub enum Error {
         location: ConfigType,
         cause: String,
     },
+    #[error("error writing to template. Cause : {0}")]
+    TemplateWriteError(String),
     #[error("error processing args. Cause : {0}")]
     ArgsProcessingError(String),
     #[error("{0}")]
