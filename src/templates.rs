@@ -14,7 +14,7 @@ use crate:: {
     fetcher::*,
 };
 
-static DEFAULT_EXT: &str = ".tpl";
+static DEFAULT_EXT: &str = ".tl";
 
 pub struct TemplatesController<'a> {
     pub input_dir: PathBuf,
