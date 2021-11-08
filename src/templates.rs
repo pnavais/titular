@@ -3,12 +3,15 @@ use std::io::{stdin, stdout, Write};
 use glob::glob;
 use std::path::{Path, PathBuf};
 use ansi_term::Colour::{ Red, Yellow, Green };
+use async_std::task;
+use url::Url;
 
 use crate:: {
     config::{MainConfig, TemplateConfig, parse as config_parse},
     error::*,
     formatter::TemplateFormatter,
     context::Context,
+    fetcher::*,
 };
 
 static DEFAULT_EXT: &str = ".tpl";
@@ -81,6 +84,77 @@ impl <'a> TemplatesController<'a> {
     pub fn format(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {        
         let template_config = self.parse(template_name)?;
         TemplateFormatter::new(&main_config).format(&context, &template_config)
+    }
+
+    pub fn add(&self, url: &str) -> Result<()> {
+        let mut template_name = url.to_owned();
+        
+        // Normalize extension
+        if !template_name.ends_with(DEFAULT_EXT) {
+            template_name.push_str(DEFAULT_EXT);
+        }
+
+        let template_url = self.parse_url(&mut template_name, url);                
+        let template_target = match self.compute_target(&template_name) {
+            Some(t) => t,
+            None => return Ok(()),
+        };
+        
+        let result = async {            
+            download_file(&template_url, &template_target).await
+        };
+        
+        let res = task::block_on(result);
+        if res.is_ok() {
+            println!("\nTemplate \"{}\" added succesfully", Green.paint(template_name));
+        }
+
+        return res;
+    }
+
+    fn parse_url(&self, template_name: &mut String, url: &str) -> String {
+        match Url::parse(url) {
+            Ok(u) => { 
+                let last_slash_idx = u.path().rfind('/').unwrap_or(0);
+                let (_, filename) = u.path().split_at(last_slash_idx);
+                *template_name = filename.replacen("/", "", 1);
+
+                if template_name.is_empty() { 
+                    print!("Template name not detected. Please specify it : ");
+                    let _ = stdout().flush();
+                    let mut input = String::new();
+                    stdin().read_line(&mut input).expect("error: unable to read user input");
+                    input = input.trim().to_lowercase();
+                    *template_name = if input.is_empty() { "unknown".to_owned() } else { input }
+                }
+                u.to_string() 
+            },
+            Err(_) => {                
+                format!("{}/{}",&self.config.defaults.templates_repo, template_name)
+            }
+        }
+    }
+
+    fn compute_target(&self, template_name: &String) -> Option<PathBuf> {
+        let template_target = self.input_dir.clone().join(&template_name);
+
+        if template_target.exists() {
+            loop {
+                let mut input = String::new();
+                print!("Template \"{}\" already exists. Overwrite ? [yN] : ", Yellow.paint(template_name));
+                let _ = stdout().flush();
+                stdin().read_line(&mut input).expect("error: unable to read user input");
+                input = input.trim().to_lowercase();
+                
+                if input == "y" || input == "yes" {
+                    break;
+                } else if input == "n" || input == "no" || input.len() <= 0 {
+                    return None;
+                }
+            }
+        }
+        
+        Some(template_target)
     }
 
     fn get_template_file(&self, name: &str) -> String {

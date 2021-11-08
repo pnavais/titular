@@ -142,6 +142,19 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                             the templates directory (default: the templates folder inside configuration directory).",
                         ),
                 )
+                .subcommand(
+                    SubCommand::with_name("add")
+                        .arg(Arg::with_name("url")
+                            .required(true)
+                            .takes_value(true)
+                            .help("The URL of template to add")
+                            .index(1))                                            
+                        .help("Downloads & install the template from the given URL.")
+                        .about(
+                            "Downloads the template in the specified URL and installs it in \
+                            the templates directory (default: the templates folder inside configuration directory).",
+                        ),
+                )
         );
 
         app

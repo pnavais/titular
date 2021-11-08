@@ -45,6 +45,8 @@ impl App {
             controller.create(matches.subcommand_matches("create").unwrap().value_of("template").unwrap())?;
         } else if matches.is_present("remove") {
             controller.remove(matches.subcommand_matches("remove").unwrap().value_of("template").unwrap())?;
+        } else if matches.is_present("add") {
+            controller.add(matches.subcommand_matches("add").unwrap().value_of("url").unwrap())?;
         }
 
         Ok(())

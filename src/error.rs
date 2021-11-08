@@ -13,7 +13,9 @@ pub enum ConfigType {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    Io(#[from] ::std::io::Error),        
+    Io(#[from] ::std::io::Error),
+    #[error(transparent)]
+    ClientError(#[from] ::reqwest::Error),     
     #[error("unable to parse {location} file {file:?}. Cause : {cause}")]
     SerdeTomlError {
         location: ConfigType,
@@ -44,6 +46,8 @@ pub enum Error {
     },
     #[error("error writing to template. Cause : {0}")]
     TemplateWriteError(String),
+    #[error("error downloading template. Cause : {0}")]
+    TemplateDownloadError(String),
     #[error("error processing args. Cause : {0}")]
     ArgsProcessingError(String),
     #[error("{0}")]

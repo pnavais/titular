@@ -35,7 +35,7 @@ impl Default for Defaults {
         Defaults {
             username: whoami::username(),
             templates_url: format!("{}/{}", "https://github.com", whoami::username()),
-            templates_repo: "https://github.com/pnavais/titular/templates".to_string(),
+            templates_repo: "https://raw.githubusercontent.com/pnavais/titular/master/templates".to_string(),
             fill_char: "*".to_string(),
             width: "full".to_string(),
             surround_start: "[".to_string(),
