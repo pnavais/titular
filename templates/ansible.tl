@@ -10,4 +10,4 @@ surround_start = "["
 surround_end = "] "
 
 [pattern]
-data = "${m:fg[c2]+[ ]}#{m2:fg[c3]}${f:pad}"
+data = "${m:fg[c2]+[ ]}#{m2:fg[c3]}${f:fg[c4]:pad}"
