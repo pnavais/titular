@@ -147,6 +147,7 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                         .arg(Arg::with_name("url")
                             .required(true)
                             .takes_value(true)
+                            .multiple(true)
                             .help("The URL of template to add")
                             .index(1))                                            
                         .help("Downloads & install the template from the given URL.")

@@ -86,7 +86,14 @@ impl <'a> TemplatesController<'a> {
         TemplateFormatter::new(&main_config).format(&context, &template_config)
     }
 
-    pub fn add(&self, url: &str) -> Result<()> {
+    pub fn add(&self, urls: &Vec<String>) -> Result<()> {
+        for url in urls {
+            self.add_template(&url)?;
+        }
+        Ok(())
+    }
+
+    fn add_template(&self, url: &str) -> Result<()> {
         let mut template_name = url.to_owned();
         
         // Normalize extension
