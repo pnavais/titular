@@ -78,6 +78,13 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                         of the terminal to use (defaults to 100%).")
         )
         .arg(
+            Arg::with_name("with-time")
+            .long("with-time")
+            .help("Adds a trailing timestamp.")
+            .long_help("Adds a timestamp to the end of the pattern using the time format
+                        configured in the settings (defaults to : [%H:%M:%S].")
+        )
+        .arg(
             Arg::with_name("n")
             .short("n")
             .long("no-newline")            

@@ -79,6 +79,9 @@ impl App {
         if self.matches.is_present("n") {            
             context.insert("skip-newline", "true");
         }
+        if self.matches.is_present("with-time") {
+            context.insert("with-time", "true");
+        }
         
         Ok(context)
     }

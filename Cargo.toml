@@ -35,3 +35,4 @@ indicatif = "0.16.2"
 futures-util = "0.3.17"
 async-std = { version = "1.10.0", features = ["attributes", "tokio1"] }
 url = "2.2.2"
+chrono = "0.4.19"

@@ -10,12 +10,13 @@ use crate::{
 use std::collections::VecDeque;
 
 use regex::Regex;
+use chrono::Local;
 use unicode_width::UnicodeWidthStr;
 use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
-    static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
+    static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad|time)))").unwrap();
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^-]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
@@ -69,9 +70,13 @@ impl<'a> TemplateFormatter<'a> {
 
     pub fn format_line(&self, fallback_map: &FallbackMap<String, String>, pattern: &str, max_term_size: usize) -> Result<bool> {        
         let mut line = pattern.to_owned();
-        
+
+        if fallback_map.contains(&"with-time".to_owned()) {
+            self.add_time(&mut line);
+        }
+
         // Compute max padding left
-        let fixed_length = VAR_REGEX.replace_all(pattern, "").width();
+        let fixed_length = VAR_REGEX.replace_all(&line, "").width();
         let mut space_left = max_term_size - fixed_length;
 
         // Resolve normal groups
@@ -175,5 +180,11 @@ impl<'a> TemplateFormatter<'a> {
         };
 
         Ok(TERM_SIZE.get_term_width() * percentage / 100)
+    }
+
+    fn add_time(&self, line: &mut String) {
+        let date = Local::now();
+        let formatted_date = date.format(" [%H:%M:%S]").to_string();
+        line.push_str(&formatted_date);
     }
 }

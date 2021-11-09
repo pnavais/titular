@@ -5,6 +5,7 @@ use crate::{
 };
 
 use truncrate::*;
+use chrono::Local;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug)]
@@ -30,6 +31,10 @@ impl<'a> ItemStyler {
         }
         else if transform.operator == "pad" {            
             ItemStyler::pad(item_name, max_pad_length);
+        } else if transform.operator == "time" {
+            let date = Local::now();
+            let formatted_date = date.format(" [%H:%M:%S]").to_string();
+            item_name.push_str(&formatted_date);
         }
 
         excess
