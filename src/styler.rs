@@ -22,9 +22,11 @@ impl<'a> ItemStyler {
         if transform.operator == "+" { *item_name = format!("{}{}", item_name, transform.value); }
         else if transform.operator == "-" { *item_name = format!("{}{}", transform.value, item_name);  }
         else if transform.operator == "fg" {
-            excess = item_name.width();
-            *item_name = ColorManager::format(&context, &item_name, transform.value);
-            excess = item_name.width().checked_sub(excess).unwrap_or(0);
+            if item_name.len() > 0 {
+                excess = item_name.width();
+                *item_name = ColorManager::format(&context, &item_name, transform.value);
+                excess = item_name.width().checked_sub(excess).unwrap_or(0);
+            }
         }
         else if transform.operator == "pad" {            
             ItemStyler::pad(item_name, max_pad_length);
