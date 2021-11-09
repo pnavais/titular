@@ -30,6 +30,8 @@ pub async fn download_file(url: &str, path: &PathBuf) -> Result<()> {
                     .progress_chars("#>-"));
                 pb.set_message(format!("Downloading {}", url));
 
+                let parent_dir = path.parent().ok_or(Error::from(format!("Failed to obtain config directory")))?;
+                std::fs::create_dir_all(parent_dir)?;
                 let mut file = File::create(path).or(Err(Error::from(format!("Failed to create file '{}'", path.to_string_lossy()))))?;
                 let mut downloaded: u64 = 0;
                 let mut stream = r.bytes_stream();

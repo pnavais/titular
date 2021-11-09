@@ -25,7 +25,7 @@ impl <'a> TemplatesController<'a> {
 
     pub fn list(&self) {        
         if Path::new(&self.input_dir).exists() {
-            let templates = glob(&*format!("{}{}", self.input_dir.to_string_lossy(), "/**/*.tpl")).expect("Failed to read glob pattern");
+            let templates = glob(&*format!("{}{}{}", self.input_dir.to_string_lossy(), "/**/*", DEFAULT_EXT)).expect("Failed to read glob pattern");
 
             let files : Vec<String> = templates.map(|t| t.unwrap().file_name().unwrap().to_owned().into_string().unwrap()).collect();
             let num_files = files.len();

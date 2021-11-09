@@ -21,10 +21,12 @@ static DEFAULT_CONF: &str = "[defaults]\n\
                             light_purple = \"FIXED(134)\"\n\
                             red          = \"NAME(Red)\"\n\
                             green        = \"NAME(Green)\"\n\
-                            yellow       = \"NAME(Yellow)\"\n
+                            yellow       = \"NAME(Yellow)\"\n\
+                            blue         = \"NAME(Blue)\"\n\
+                            orange       = \"RGB(255,165,0)\"\n\
                             space        = \" \"\n\n\
                             [templates]\n\
-                            directory = \"$HOME/.config/titular/templates\"\n\
+                            directory = \"${templates_dir}\"\n\
                             default = \"Basic\"\n";
 
 static DEFAULT_CONF_FILE: &str = "titular.conf";
@@ -52,11 +54,13 @@ impl BootStrap {
     }
 }
 
-fn create_default_config(input_dir: &PathBuf) -> Result<String> {   
-    let parent_dir = input_dir.parent().ok_or(Error::ConfigError(input_dir.to_string_lossy().into_owned()))?;
+fn create_default_config(config_file: &PathBuf) -> Result<String> {   
+    let parent_dir = config_file.parent().ok_or(Error::ConfigError(config_file.to_string_lossy().into_owned()))?;
     std::fs::create_dir_all(parent_dir)?;
-    File::create(&input_dir)?.write_all(DEFAULT_CONF.as_bytes())?;
-    Ok(String::from(DEFAULT_CONF))
+    let templates_dir = parent_dir.join("templates").to_string_lossy().into_owned();
+    let config_data = DEFAULT_CONF.replacen("${templates_dir}", &templates_dir, 1);
+    File::create(&config_file)?.write_all(config_data.as_bytes())?;
+    Ok(String::from(config_data))
 }
 
 pub fn parse_main_config() -> Result<MainConfig> {
