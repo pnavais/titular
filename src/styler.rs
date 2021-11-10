@@ -15,10 +15,11 @@ impl<'a> ItemStyler {
         let mut excess = 0;
         if transform.operator == "+" { *item_name = format!("{}{}", item_name, transform.value); }
         else if transform.operator == "-" { *item_name = format!("{}{}", transform.value, item_name);  }
-        else if transform.operator == "fg" {
+        else if transform.operator == "*" { ItemStyler::pad(item_name, transform.value.parse::<usize>().unwrap_or(1));  }
+        else if transform.operator == "fg" || transform.operator == "bg"{
             if item_name.len() > 0 {
                 excess = item_name.width();
-                *item_name = ColorManager::format(&context, &item_name, transform.value);
+                *item_name = ColorManager::format(&context, &item_name, transform.value, transform.operator == "bg");
                 excess = item_name.width().checked_sub(excess).unwrap_or(0);
             }
         }

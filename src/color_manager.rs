@@ -12,14 +12,19 @@ lazy_static! {
 
 pub struct ColorManager;
 
+use ansi_term::Style;
 use ansi_term::Colour;
 use ansi_term::Colour::*;
 
 impl ColorManager {
 
-    pub fn format<'a>(colours: &FallbackMap<String, String>, txt: &'a str, color_name: &str) -> String {
+    pub fn format<'a>(colours: &FallbackMap<String, String>, txt: &'a str, color_name: &str, is_bg: bool) -> String {
         match ColorManager::get_style(colours, color_name) {
-            Some(c) => c.paint(txt).to_string(),
+            Some(c) => {
+                let mut style = Style::new();
+                style = if is_bg { style.on(c) } else { style.fg(c) };
+                style.paint(txt).to_string()
+            },
             None => txt.to_owned(),
         }
     }

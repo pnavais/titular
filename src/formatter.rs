@@ -16,8 +16,8 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
-    static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
-    static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^-]+)").unwrap();
+    static ref OP_REGEX: Regex = Regex::new("((:|\\+|\\-|\\*)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
+    static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^\\-|^\\*]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
 
@@ -95,7 +95,12 @@ impl<'a> TemplateFormatter<'a> {
         
         for group in VAR_REGEX.captures_iter(&items.clone()) {
             let item_group = group.get(2).map_or("", |m| m.as_str());
-            let item_name = ITEM_REGEX.captures(item_group).unwrap().get(1).map_or("", |m| m.as_str());
+            let item_name = match ITEM_REGEX.captures(item_group) {
+                Some(i) => i.get(1).map_or("", |m| m.as_str()),
+                None => return Err(Error::from(format!("Error processing pattern {}", item_group))),
+            };
+            
+            
             let mut has_padding: bool = false;
             let var_content = VarContent {
                 item: item_name,

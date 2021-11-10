@@ -15,14 +15,14 @@ impl <'a> Hash for Transform<'a> {
 
 impl <'a> Ord for Transform<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.operator == "+" || self.operator == "-" {
-            if other.operator == "+" || other.operator == "-" {
+        if self.operator == "+" || self.operator == "-" || self.operator == "*" {
+            if other.operator == "+" || other.operator == "*" || self.operator == "*" {
                 Ordering::Equal
             } else {
                 Ordering::Less
             }
         } else if self.operator == "pad" {
-            if other.operator == "+" || other.operator == "-" {
+            if other.operator == "+" || other.operator == "-" || self.operator == "*" {
                 Ordering::Greater
             } else {
                 Ordering::Less
