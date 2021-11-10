@@ -1,18 +1,11 @@
-
 use crate::{
     color_manager::ColorManager,
     fallback_map::FallbackMap,
+    transform::Transform,
 };
 
 use truncrate::*;
-use chrono::Local;
 use unicode_width::UnicodeWidthStr;
-
-#[derive(Debug)]
-pub struct Transform<'a> {
-    pub operator: &'a str,
-    pub value: &'a str,
-}
 
 pub struct ItemStyler {}
 
@@ -29,12 +22,8 @@ impl<'a> ItemStyler {
                 excess = item_name.width().checked_sub(excess).unwrap_or(0);
             }
         }
-        else if transform.operator == "pad" {            
+        else if transform.operator == "pad" {
             ItemStyler::pad(item_name, max_pad_length);
-        } else if transform.operator == "time" {
-            let date = Local::now();
-            let formatted_date = date.format(" [%H:%M:%S]").to_string();
-            item_name.push_str(&formatted_date);
         }
 
         excess

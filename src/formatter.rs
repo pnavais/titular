@@ -3,20 +3,20 @@ use crate::{
     error::*,
     context::Context,
     fallback_map::FallbackMap,
-    styler::{ItemStyler, Transform},
+    styler::ItemStyler,
+    transform::Transform,
     term::TERM_SIZE,
 };
 
-use std::collections::VecDeque;
+use std::collections::HashSet;
 
 use regex::Regex;
-use chrono::Local;
 use unicode_width::UnicodeWidthStr;
 use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
-    static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad|time)))").unwrap();
+    static ref OP_REGEX: Regex = Regex::new("((:|\\+|-)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^-]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
@@ -26,10 +26,8 @@ struct VarContent<'a> {
     item: &'a str,    
     marker: char,    
     is_filler: bool,
-    transforms: VecDeque<Transform<'a>>,
+    transforms: Vec<Transform<'a>>,
 }
-
-
 
 struct ResolveStats {
     current_length: usize,
@@ -123,18 +121,18 @@ impl<'a> TemplateFormatter<'a> {
         Ok(ResolveStats { current_length, num_groups_pad})
     }
 
-    fn get_transforms(&self, item_group: &'a str, has_padding: &mut bool) -> VecDeque<Transform> {
-        let mut transform_list: VecDeque<Transform> = VecDeque::new();
+    fn get_transforms(&self, item_group: &'a str, has_padding: &mut bool) -> Vec<Transform> {
+        let mut transform_set: HashSet<Transform> = HashSet::new();
             OP_REGEX.captures_iter(item_group).for_each(|m| {                
                 let t = Transform {
                     operator: m.get(6).or(m.get(4)).or(m.get(2)).map(|s| s.as_str()).unwrap(),
                     value: m.get(5).map_or("", |s| s.as_str()),
                 };
                 *has_padding = *has_padding || t.operator == "pad";
-                if t.operator == "pad" || t.operator == "+" || t.operator == "-" { 
-                    transform_list.push_front(t) 
-                } else { transform_list.push_back(t) }
+                transform_set.insert(t);
             });
+        let mut transform_list = transform_set.into_iter().collect::<Vec<Transform>>();
+        transform_list.sort();
         transform_list
     }
 
@@ -182,9 +180,7 @@ impl<'a> TemplateFormatter<'a> {
         Ok(TERM_SIZE.get_term_width() * percentage / 100)
     }
 
-    fn add_time(&self, line: &mut String) {
-        let date = Local::now();
-        let formatted_date = date.format(" [%H:%M:%S]").to_string();
-        line.push_str(&formatted_date);
+    fn add_time(&self, line: &mut String) {        
+        line.push_str(&self.main_config.defaults.time_pattern);
     }
 }

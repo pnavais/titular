@@ -28,6 +28,8 @@ pub struct Defaults {
     pub width: String,
     pub surround_start: String,
     pub surround_end: String,
+    pub time_format: String,
+    pub time_pattern: String,
 }
 
 impl Default for Defaults {
@@ -40,6 +42,8 @@ impl Default for Defaults {
             width: "full".to_string(),
             surround_start: "[".to_string(),
             surround_end: "]".to_string(),
+            time_format: "%H:%M:%S".to_string(),
+            time_pattern: "${space}%{time:fg[tc]}".to_string(),
         }
     }
 }

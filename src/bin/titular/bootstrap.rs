@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::path::PathBuf;
+use chrono::Local;
 use std::io::prelude::*;
 
 pub use titular:: {
@@ -12,10 +13,12 @@ use crate::{
 };
 
 static DEFAULT_CONF: &str = "[defaults]\n\
-                            fill_char = \"*\"\n\
-                            width = \"full\"\n\
+                            fill_char      = \"*\"\n\
+                            width          = \"full\"\n\
                             surround_start = \"[\"\n\
-                            surround_end = \"]\"\n\n\
+                            surround_end   = \"]\"\n\
+                            time_pattern   = \"${space}%{time:fg[tc]}\"\n\
+                            time_format    =  \"%H:%M:%S\"\n\n\
                             [vars]\n\
                             steel_blue   = \"RGB(70, 130, 180)\"\n\
                             light_purple = \"FIXED(134)\"\n\
@@ -26,8 +29,8 @@ static DEFAULT_CONF: &str = "[defaults]\n\
                             orange       = \"RGB(255,165,0)\"\n\
                             space        = \" \"\n\n\
                             [templates]\n\
-                            directory = \"${templates_dir}\"\n\
-                            default = \"Basic\"\n";
+                            directory    = '${templates_dir}'\n\
+                            default      = \"Basic\"\n";
 
 static DEFAULT_CONF_FILE: &str = "titular.conf";
 
@@ -83,6 +86,6 @@ pub fn parse_main_config() -> Result<MainConfig> {
     main_config.vars.insert("defaults.width".to_owned(), main_config.defaults.width.to_owned());
     main_config.vars.insert("defaults.surround_start".to_owned(), main_config.defaults.surround_start.to_owned());
     main_config.vars.insert("defaults.surround_end".to_owned(), main_config.defaults.surround_end.to_owned());
-
+    main_config.vars.insert("time".to_owned(), Local::now().format(&main_config.defaults.time_format).to_string());
     Ok(main_config)
 }
