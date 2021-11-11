@@ -81,7 +81,11 @@ impl <'a> TemplatesController<'a> {
         Ok(())
     }
     
-    pub fn format(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {        
+    pub fn format(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {      
+        if self.get_template_full_path(template_name).is_none() {
+            self.add_template(template_name)?;
+        }
+        
         let template_config = self.parse(template_name)?;
         TemplateFormatter::new(&main_config).format(&context, &template_config)
     }
@@ -167,6 +171,17 @@ impl <'a> TemplatesController<'a> {
     fn get_template_file(&self, name: &str) -> String {
         let file_name = String::from(name).to_lowercase();
         if name.ends_with(DEFAULT_EXT) { file_name } else { file_name + DEFAULT_EXT }
+    }
+
+    fn get_template_full_path(&self, name: &str) -> Option<PathBuf> {
+        let template_name = self.get_template_file(name);
+        let template_target = self.input_dir.clone().join(&template_name);
+
+        if template_target.exists() {
+            Some(template_target)
+        } else {
+            None
+        }
     }
     
     fn parse(&self, name: &str) -> Result<TemplateConfig> {

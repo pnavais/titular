@@ -51,7 +51,7 @@ pub async fn download_file(url: &str, path: &PathBuf) -> Result<()> {
 
                 Ok(())
             } else {
-                Err(Error::TemplateDownloadError(format!("Error {}", r.status())))
+                Err(Error::TemplateDownloadError(format!("{}", path.file_name().and_then(|name| name.to_str()).unwrap()), format!("Error {}", r.status())))
             }
         },
         Err(e) => Err(Error::from(e)),

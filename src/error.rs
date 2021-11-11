@@ -46,8 +46,8 @@ pub enum Error {
     },
     #[error("error writing to template. Cause : {0}")]
     TemplateWriteError(String),
-    #[error("error downloading template. Cause : {0}")]
-    TemplateDownloadError(String),
+    #[error("error downloading template \"{0}\". Cause : {1}")]
+    TemplateDownloadError(String, String),
     #[error("error processing args. Cause : {0}")]
     ArgsProcessingError(String),
     #[error("{0}")]
