@@ -21,7 +21,7 @@ impl <'a> Ord for Transform<'a> {
             } else {
                 Ordering::Less
             }
-        } else if self.operator == "pad" {
+        } else if self.operator == "pad" || self.operator == "fit" {
             if other.operator == "+" || other.operator == "-" || self.operator == "*" {
                 Ordering::Greater
             } else {
@@ -41,6 +41,7 @@ impl <'a> PartialOrd for Transform<'a> {
 
 impl <'a> PartialEq for Transform<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.operator == other.operator
+        self.operator == other.operator || (self.operator == "fit" && other.operator == "pad")
+        || (self.operator == "pad" && other.operator == "fit")
     }
 }

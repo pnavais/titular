@@ -23,7 +23,7 @@ impl<'a> ItemStyler {
                 excess = item_name.width().checked_sub(excess).unwrap_or(0);
             }
         }
-        else if transform.operator == "pad" {
+        else if transform.operator == "pad" || transform.operator == "fit" {
             ItemStyler::pad(item_name, max_pad_length);
         }
 
@@ -41,11 +41,13 @@ impl<'a> ItemStyler {
     fn pad(txt: &'a mut String, max_length: usize) -> &'a String {        
         let pattern = txt.to_owned();
 
-        while txt.width() < max_length {
-            *txt+=&pattern;            
+        if ! txt.is_empty() {
+            while txt.width() < max_length {
+                *txt+=&pattern;
+            }
+            
+            *txt = txt.truncate_to_boundary(max_length).to_owned();
         }
-        
-        *txt = txt.truncate_to_boundary(max_length).to_owned();        
         txt
     }
 

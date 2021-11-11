@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
-    static ref OP_REGEX: Regex = Regex::new("((:|\\+|\\-|\\*)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad)))").unwrap();
+    static ref OP_REGEX: Regex = Regex::new("((:|\\+|\\-|\\*)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad|fit)))").unwrap();
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^\\-|^\\*]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
@@ -59,14 +59,15 @@ impl<'a> TemplateFormatter<'a> {
 
         // Compute max term size
         let max_term_size = self.compute_max_term_size(&fallback_map)?;
+        let mut previous_line_size = 0;
         
         for pattern in template_config.pattern.data.split("\n") {
-            result = self.format_line(&fallback_map, pattern, max_term_size);
+            result = self.format_line(&fallback_map, pattern, max_term_size, &mut previous_line_size);
         }
         result
     }
 
-    pub fn format_line(&self, fallback_map: &FallbackMap<String, String>, pattern: &str, max_term_size: usize) -> Result<bool> {        
+    pub fn format_line(&self, fallback_map: &FallbackMap<String, String>, pattern: &str, max_term_size: usize, previous_line_size: &mut usize) -> Result<bool> {        
         let mut line = pattern.to_owned();
 
         if fallback_map.contains(&"with-time".to_owned()) {
@@ -78,18 +79,19 @@ impl<'a> TemplateFormatter<'a> {
         let mut space_left = max_term_size - fixed_length;
 
         // Resolve normal groups
-        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left)?;        
+        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left,  previous_line_size)?;        
         let max_pad_length = (max_term_size.checked_sub(fixed_length + resolve_stats.current_length)).unwrap_or(0) / std::cmp::max(resolve_stats.num_groups_pad,1);
         
         // Resolve padding groups
-        self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left)?;
+        self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, previous_line_size)?;
 
         print!("{}{}", line, if !fallback_map.contains(&"skip-newline".to_owned()) { "\n" } else { ""});
+        *previous_line_size = line.width();
 
         Ok(true)
     }
 
-    fn format_items(&self, items: &mut String, context: &FallbackMap<String, String>, apply_padding: bool, max_pad_length: usize, space_left: &mut usize) -> Result<ResolveStats> {               
+    fn format_items(&self, items: &mut String, context: &FallbackMap<String, String>, apply_padding: bool, max_pad_length: usize, space_left: &mut usize, previous_line_size: &usize) -> Result<ResolveStats> {               
         let mut num_groups_pad = 0;
         let mut current_length = 0;
         
@@ -111,13 +113,14 @@ impl<'a> TemplateFormatter<'a> {
             
             if (!apply_padding && !has_padding) || apply_padding {            
                 let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
-                let item = self.format_item(context, &var_content, max_pad_length + excess);
+                let item = self.format_item(context, &var_content, max_pad_length + excess, previous_line_size);
                 
                 *items = items.replacen(group.get(0).map_or("", |m| m.as_str()), &item.value, 1);
                 
                 current_length+=item.length;
                 *space_left = *space_left - std::cmp::min(item.length, *space_left);
             }
+
             if has_padding {
                 num_groups_pad+=1;
             }
@@ -133,7 +136,7 @@ impl<'a> TemplateFormatter<'a> {
                     operator: m.get(6).or(m.get(4)).or(m.get(2)).map(|s| s.as_str()).unwrap(),
                     value: m.get(5).map_or("", |s| s.as_str()),
                 };
-                *has_padding = *has_padding || t.operator == "pad";
+                *has_padding = *has_padding || t.operator == "pad" || t.operator == "fit";
                 transform_set.insert(t);
             });
         let mut transform_list = transform_set.into_iter().collect::<Vec<Transform>>();
@@ -141,31 +144,39 @@ impl<'a> TemplateFormatter<'a> {
         transform_list
     }
 
-    fn format_item(&self, context: &'a FallbackMap<String, String>, var_content: &VarContent, max_pad_length: usize) -> FormattedItem {        
+    fn format_item(&self, context: &'a FallbackMap<String, String>, var_content: &VarContent, max_pad_length: usize, previous_line_size: &usize) -> FormattedItem {        
         // Try to resolve the variable using the context or take it from the template if not available
-        let item_ctx = context.get(&var_content.item.to_owned());                 
-        // Process the item operation
-        let item_val = if item_ctx.is_some() { item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
-        let mut item_name = item_val.to_owned();
+        let item_ctx = context.get(&var_content.item.to_owned());
+        let mut item_name;
+        let item_length;
 
-        let mut excess_length = 0;
+        if item_ctx.is_some() {
+            // Process the item operation
+            let item_val = if item_ctx.is_some() { item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
+            item_name = item_val.to_owned();
 
-        // Surround (Prefix -> include text in style)
-        if var_content.marker == '%' {
-            ItemStyler::surround(&mut item_name, context);
-        }
-        
-        // Apply style
-        for transform in &var_content.transforms {
-            excess_length = ItemStyler::style(&mut item_name, transform, context, max_pad_length);
-        }
-        
-        // Surround (Postfix -> exclude text in style)
-        if var_content.marker == '#' {
-            ItemStyler::surround(&mut item_name, context);
-        }
+            let mut excess_length = 0;
 
-        let item_length = item_name.width() - excess_length;
+            // Surround (Prefix -> include text in style)
+            if var_content.marker == '%' {
+                ItemStyler::surround(&mut item_name, context);
+            }
+            
+            // Apply style
+            for transform in &var_content.transforms {
+                excess_length = ItemStyler::style(&mut item_name, transform, context, if transform.operator == "fit" { *previous_line_size } else { max_pad_length });
+            }
+            
+            // Surround (Postfix -> exclude text in style)
+            if var_content.marker == '#' {
+                ItemStyler::surround(&mut item_name, context);
+            }
+
+            item_length = item_name.width() - excess_length;
+        } else {
+            item_name = String::from("");
+            item_length = 0;
+        }
         
         FormattedItem { value: item_name, length: item_length }
     }
