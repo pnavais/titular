@@ -102,7 +102,6 @@ impl<'a> TemplateFormatter<'a> {
                 None => return Err(Error::from(format!("Error processing pattern {}", item_group))),
             };
             
-            
             let mut has_padding: bool = false;
             let var_content = VarContent {
                 item: item_name,
@@ -111,7 +110,7 @@ impl<'a> TemplateFormatter<'a> {
                 transforms: self.get_transforms(item_group, &mut has_padding),
             };
             
-            if (!apply_padding && !has_padding) || apply_padding {            
+            if (!apply_padding && !has_padding) || apply_padding {                   
                 let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
                 let item = self.format_item(context, &var_content, max_pad_length + excess, previous_line_size);
                 

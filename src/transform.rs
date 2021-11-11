@@ -9,7 +9,7 @@ pub struct Transform<'a> {
 
 impl <'a> Hash for Transform<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.operator.hash(state);
+        if self.operator == "fit" { "pad".hash(state) } else { self.operator.hash(state) }
     }
 }
 

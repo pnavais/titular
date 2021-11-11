@@ -11,6 +11,6 @@ c4 = "c2"
 
 [pattern]
 data = """\
-		${m:fg[c2]+[ ]}%{m2:fg[c3]}\n\
-		${f:fg[c4]:pad}\
+		${m:fg[c2]}%{m2:fg[c3]-[ ]}\n\
+		${f:fg[c4]:fit}\
 	   """
