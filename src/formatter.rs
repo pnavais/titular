@@ -29,11 +29,13 @@ struct VarContent<'a> {
     transforms: Vec<Transform<'a>>,
 }
 
+#[derive(Debug)]
 struct ResolveStats {
     current_length: usize,
     num_groups_pad : usize,
 }
 
+#[derive(Debug)]
 struct FormattedItem {
     value: String,
     length: usize,
@@ -73,20 +75,23 @@ impl<'a> TemplateFormatter<'a> {
         if fallback_map.contains(&"with-time".to_owned()) {
             self.add_time(&mut line);
         }
-
+        
         // Compute max padding left
         let fixed_length = VAR_REGEX.replace_all(&line, "").width();
         let mut space_left = max_term_size - fixed_length;
 
-        // Resolve normal groups
-        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left,  previous_line_size)?;        
+        // Resolve normal groups        
+        let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left,  previous_line_size)?;
+        *previous_line_size = if resolve_stats.current_length == 0 { *previous_line_size } else { previous_line_size.checked_sub(resolve_stats.current_length).unwrap_or(0) };        
         let max_pad_length = (max_term_size.checked_sub(fixed_length + resolve_stats.current_length)).unwrap_or(0) / std::cmp::max(resolve_stats.num_groups_pad,1);
-        
+                
         // Resolve padding groups
-        self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, previous_line_size)?;
+        let resolve_stats_padding = self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, &previous_line_size)?;
 
-        print!("{}{}", line, if !fallback_map.contains(&"skip-newline".to_owned()) { "\n" } else { ""});
-        *previous_line_size = line.width();
+        if !line.is_empty() {
+            print!("{}{}", line, if !fallback_map.contains(&"skip-newline".to_owned()) { "\n" } else { ""});
+        }
+        *previous_line_size = std::cmp::max(resolve_stats.current_length, resolve_stats_padding.current_length);
 
         Ok(true)
     }
@@ -113,12 +118,11 @@ impl<'a> TemplateFormatter<'a> {
             if (!apply_padding && !has_padding) || apply_padding {                   
                 let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
                 let item = self.format_item(context, &var_content, max_pad_length + excess, previous_line_size);
-                
-                *items = items.replacen(group.get(0).map_or("", |m| m.as_str()), &item.value, 1);
-                
+                                
+                *items = items.replacen(group.get(0).map_or("", |m| m.as_str()), &item.value, 1);                
                 current_length+=item.length;
                 *space_left = *space_left - std::cmp::min(item.length, *space_left);
-            }
+            }       
 
             if has_padding {
                 num_groups_pad+=1;
