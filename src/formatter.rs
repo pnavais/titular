@@ -91,13 +91,14 @@ impl<'a> TemplateFormatter<'a> {
         let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left,  previous_line_size)?;
         *previous_line_size = if resolve_stats.current_length == 0 { *previous_line_size } else { previous_line_size.checked_sub(resolve_stats.current_length).unwrap_or(0) };        
         let max_pad_length = (max_term_size.checked_sub(fixed_length + resolve_stats.current_length)).unwrap_or(0) / std::cmp::max(resolve_stats.num_groups_pad,1);
-                
+                        
         // Resolve padding groups
         let resolve_stats_padding = self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, &previous_line_size)?;
 
         if !line.is_empty() {
             print!("{}{}", line, if !fallback_map.contains(&"skip-newline".to_owned()) { "\n" } else { ""});
         }
+
         *previous_line_size = std::cmp::max(resolve_stats.current_length, resolve_stats_padding.current_length);
 
         Ok(true)
@@ -127,9 +128,11 @@ impl<'a> TemplateFormatter<'a> {
             if (!apply_padding && !has_padding) || apply_padding {                   
                 let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
                 let item = self.format_item(context, &var_content, max_pad_length + excess, previous_line_size);
+                
                                 
                 *items = items.replacen(group.get(0).map_or("", |m| m.as_str()), &item.value, 1);                
                 current_length+=item.length;
+
                 *space_left = *space_left - std::cmp::min(item.length, *space_left);
             }       
 
@@ -178,14 +181,14 @@ impl<'a> TemplateFormatter<'a> {
             
             // Apply style
             for transform in &var_content.transforms {
-                excess_length = ItemStyler::style(&mut item_name, transform, context, if transform.operator == "fit" { *previous_line_size } else { max_pad_length });
+                excess_length += ItemStyler::style(&mut item_name, transform, context, if transform.operator == "fit" { *previous_line_size } else { max_pad_length });
             }
             
             // Surround (Postfix -> exclude text in style)
             if var_content.marker == '#' {
                 ItemStyler::surround(&mut item_name, context);
             }
-
+            
             item_length = item_name.width() - excess_length;
         } else {
             item_name = String::from("");
