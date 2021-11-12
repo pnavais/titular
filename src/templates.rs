@@ -3,14 +3,20 @@ use std::io::{stdin, stdout, Write};
 use glob::glob;
 use std::path::{Path, PathBuf};
 use ansi_term::Colour::{ Red, Yellow, Green };
+#[cfg(feature = "fetcher")]
 use async_std::task;
+#[cfg(feature = "fetcher")]
 use url::Url;
 
 use crate:: {
     config::{MainConfig, TemplateConfig, parse as config_parse},
     error::*,
     formatter::TemplateFormatter,
-    context::Context,
+    context::Context,    
+};
+
+#[cfg(feature = "fetcher")]
+use crate:: {
     fetcher::*,
 };
 
@@ -21,10 +27,13 @@ pub struct TemplatesController<'a> {
     pub config: &'a MainConfig,
 }
 
+/// Provides all the operations involving templates management (list, open, create, edit, add (when "fetcher" feature enabled))
+/// and formatting/rendering.
 impl <'a> TemplatesController<'a> {
 
+    /// Lists the templates currently available in the templates repository.
     pub fn list(&self) {        
-        if Path::new(&self.input_dir).exists() {
+        if self.input_dir.exists() {
             let templates = glob(&*format!("{}{}{}", self.input_dir.to_string_lossy(), "/**/*", DEFAULT_EXT)).expect("Failed to read glob pattern");
 
             let files : Vec<String> = templates.map(|t| t.unwrap().file_name().unwrap().to_owned().into_string().unwrap()).collect();
@@ -42,6 +51,7 @@ impl <'a> TemplatesController<'a> {
         }
     }
 
+    /// Creates a new template from stratch using the default template contents.
     pub fn create(&self, name: &str) ->  Result<()> {
         let (_, _, created) = self.create_new_template(name, false)?;
         if created {
@@ -52,6 +62,7 @@ impl <'a> TemplatesController<'a> {
         Ok(())
     }
 
+    /// Opens the given template in the default system editor (see "edit" crate for detailed information).
     pub fn open(&self, name: &str) ->  Result<()> {
         let (path, template, _) = self.create_new_template(name, true)?;
         
@@ -65,6 +76,7 @@ impl <'a> TemplatesController<'a> {
         }
     }
 
+    /// Removes the template from the templates repository.
     pub fn remove(&self, name: &str) ->  Result<()> {
         let path = self.get_template_file(name);
         let template = self.input_dir.clone().join(&path);
@@ -81,15 +93,21 @@ impl <'a> TemplatesController<'a> {
         Ok(())
     }
     
-    pub fn format(&self, context: &Context, main_config: &MainConfig, template_name: &str) -> Result<bool> {      
+    /// Performs the rendering of the template using the template formatter.
+    /// In case the "fetched" feature is enabled, the template is downloaded
+    /// automatically in case it's not present (and is available in the remote repository).
+    pub fn format(&self, context: &Context, template_name: &str) -> Result<bool> {    
+        #[cfg(feature = "fetcher")]  
         if self.get_template_full_path(template_name).is_none() {
             self.add_template(template_name)?;
         }
         
         let template_config = self.parse(template_name)?;
-        TemplateFormatter::new(&main_config).format(&context, &template_config)
+        TemplateFormatter::new(&self.config).format(&context, &template_config)
     }
 
+    #[cfg(feature = "fetcher")]
+    /// Adds multiple templates by the name (if available in the remote repository) or URL.
     pub fn add(&self, urls: &Vec<String>) -> Result<()> {
         for url in urls {
             self.add_template(&url)?;
@@ -97,6 +115,8 @@ impl <'a> TemplatesController<'a> {
         Ok(())
     }
 
+    #[cfg(feature = "fetcher")]
+    /// Adds a given template by name or URL.
     fn add_template(&self, url: &str) -> Result<()> {
         let mut template_name = url.to_owned();
         
@@ -123,6 +143,10 @@ impl <'a> TemplatesController<'a> {
         return res;
     }
 
+    #[cfg(feature = "fetcher")]
+    /// Parses the URL to extract the template name. In case
+    /// it cannot be computed automatically, the user will be prompted
+    /// for a name.
     fn parse_url(&self, template_name: &mut String, url: &str) -> String {
         match Url::parse(url) {
             Ok(u) => { 
@@ -146,6 +170,9 @@ impl <'a> TemplatesController<'a> {
         }
     }
 
+    #[cfg(feature = "fetcher")]
+    /// Provides a template full path and optionally creates it
+    /// if not available.
     fn compute_target(&self, template_name: &String) -> Option<PathBuf> {
         let template_target = self.input_dir.clone().join(&template_name);
 
@@ -168,11 +195,14 @@ impl <'a> TemplatesController<'a> {
         Some(template_target)
     }
 
+    /// Retrieves the template file name (with extension)
     fn get_template_file(&self, name: &str) -> String {
         let file_name = String::from(name).to_lowercase();
         if name.ends_with(DEFAULT_EXT) { file_name } else { file_name + DEFAULT_EXT }
     }
 
+    #[cfg(feature = "fetcher")]
+    /// Retrieves the template full path
     fn get_template_full_path(&self, name: &str) -> Option<PathBuf> {
         let template_name = self.get_template_file(name);
         let template_target = self.input_dir.clone().join(&template_name);
@@ -184,6 +214,8 @@ impl <'a> TemplatesController<'a> {
         }
     }
     
+    /// Parses a given template name in the repository to obtain the template
+    /// configuration.
     fn parse(&self, name: &str) -> Result<TemplateConfig> {
         let path = self.get_template_file(name);
         let toml_data = match config_parse(&self.input_dir.clone().join(&path)) {
@@ -202,6 +234,8 @@ impl <'a> TemplatesController<'a> {
         Ok(template_config)
     }
 
+    /// Creates a new template in the repository if not existing asking optionally
+    /// the user using a confirmation prompt.
     fn create_new_template(&self, name: &str, prompt_user: bool) -> Result<(String, PathBuf, bool)> {
         let path = self.get_template_file(name);
         let template = self.input_dir.clone().join(&path);
@@ -247,6 +281,7 @@ struct TemplateWriter {}
 
 impl TemplateWriter {
     
+    /// Writes a new template file using default and automatically computed contents (i.e. user name)
     fn write_new(file_path: &PathBuf, config: &MainConfig) -> Result<()> {        
         let file_name = TemplateWriter::get_template_name(&file_path);
         let mut template = DEFAULT_TEMPLATE.replacen("@name", &file_name, 1);
@@ -269,6 +304,7 @@ impl TemplateWriter {
         }
     }
 
+    /// Retrieves the template name (without extension)
     fn get_template_name(file_path: &PathBuf) -> String {
         let file_name = file_path.file_name().map_or("@file_name".to_string(), |m| { 
             m.to_string_lossy().as_ref().replacen(&format!("{}{}", ".", DEFAULT_EXT),  "", 1).to_owned() 

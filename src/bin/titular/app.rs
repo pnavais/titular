@@ -36,29 +36,39 @@ impl App {
     }
     
 
+    /// Runs any of the templates subcommands. Currently supported :
+    /// - list : shows the files stored in the templates repository
+    /// - edit : opens or creates if not existing the given template in the default system editor (see "edit" crate for more information)
+    /// - create : creates a new template from sratch with a default template pattern
+    /// - remove : deletes the given template from the templates repository
+    /// - add (only when feature "fetcher" is enabled) : downloads and installs a template from the default templates remote repository
+    ///   or a custom URL
     fn run_template_subcommand(&self, controller: TemplatesController, matches: &clap::ArgMatches) -> Result<()> {
         if matches.is_present("list") {
             controller.list();
-        } else if matches.is_present("open") {
+        } else if matches.is_present("edit") {
             controller.open(matches.subcommand_matches("open").unwrap().value_of("template").unwrap())?;
         } else if matches.is_present("create") {
             controller.create(matches.subcommand_matches("create").unwrap().value_of("template").unwrap())?;
         } else if matches.is_present("remove") {
             controller.remove(matches.subcommand_matches("remove").unwrap().value_of("template").unwrap())?;
-        } else if matches.is_present("add") {
+        } 
+        else if matches.is_present("add") {
+            #[cfg(feature = "fetcher")]
             controller.add(&matches.subcommand_matches("add").unwrap().values_of("url").unwrap().map(|v| v.to_string()).collect())?;
         }
 
         Ok(())
     }
 
+    /// Creates the context with the matched information supplied in the command 
+    /// line arguments. (e.g. template name, messages, fillers, vars, etc...)
     fn build_context(&self) -> Result<Context> {
         let mut context = Context::new();
 
         context.insert("template", self.matches.value_of("template").or(Some("")).unwrap());
         if self.matches.is_present("message") {                        
             context.insert_multi("m", self.matches.values_of("message").unwrap().map(|v| v.to_string()).collect());
-            
         }
         if self.matches.is_present("filler") {                        
             context.insert_multi("f", self.matches.values_of("filler").unwrap().map(|v| v.to_string()).collect());
@@ -86,6 +96,8 @@ impl App {
         Ok(context)
     }
 
+    /// Main entry point of the application, bootstraps the main configuration and creates the controller
+    /// to process the templates rendering.
     pub fn start(&self) -> Result<bool> {        
         // Parse the default config
         let bootstrap = BootStrap::new()?;
@@ -99,7 +111,7 @@ impl App {
             _ => { 
                 let context = self.build_context()?;
                 let template_name = self.matches.value_of("template").or(Some(&bootstrap.get_config().templates.default)).unwrap();                                                
-                controller.format(&context, &bootstrap.get_config(), template_name)?;
+                controller.format(&context, template_name)?;
                 Ok(true)                
             }
         }

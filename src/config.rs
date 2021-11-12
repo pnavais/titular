@@ -1,9 +1,10 @@
-use serde::Deserialize;
-
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use std::collections::HashMap;
+
+use serde::Deserialize;
+use chrono::Local;
 
 use crate:: {
     error::*,
@@ -30,6 +31,16 @@ pub struct Defaults {
     pub surround_end: String,
     pub time_format: String,
     pub time_pattern: String,
+}
+
+impl Default for MainConfig {
+    fn default() -> MainConfig {
+        MainConfig {
+            defaults: Defaults::default(),
+            templates: Templates::default(),
+            vars: HashMap::new(),
+        }
+    }
 }
 
 impl Default for Defaults {
@@ -96,6 +107,24 @@ pub struct Details {
 #[derive(Deserialize, Debug)]
 pub struct Pattern {
     pub data: String,
+}
+
+impl MainConfig {
+    pub fn new() -> Self {
+        let mut main_config = MainConfig { ..Default::default() };
+        main_config.init();
+        main_config
+    }
+
+    /// Perfoms custom initialization using the main configuration values
+    pub fn init(&mut self) {
+        // Keep defaults as vars
+        self.vars.insert("defaults.fill_char".to_owned(), self.defaults.fill_char.to_owned());
+        self.vars.insert("defaults.width".to_owned(), self.defaults.width.to_owned());
+        self.vars.insert("defaults.surround_start".to_owned(), self.defaults.surround_start.to_owned());
+        self.vars.insert("defaults.surround_end".to_owned(), self.defaults.surround_end.to_owned());
+        self.vars.insert("time".to_owned(), Local::now().format(&self.defaults.time_format).to_string());
+    }
 }
 
 impl MapProvider<String, String> for TemplateConfig {

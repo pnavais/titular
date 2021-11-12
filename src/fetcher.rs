@@ -13,6 +13,9 @@ use reqwest::Client;
 use indicatif::{ProgressBar, ProgressStyle};
 use futures_util::StreamExt;
 
+#[cfg(feature = "fetcher")]
+/// Downloads asynchronously the resource defined in the given URL and
+/// stores it in the supplied path.
 pub async fn download_file(url: &str, path: &PathBuf) -> Result<()> {   
     let resp = Client::new()
                 .get(url)

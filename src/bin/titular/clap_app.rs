@@ -12,7 +12,7 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
         AppSettings::ColorNever
     };
 
-    let app = ClapApp::new(crate_name!())
+    let mut app = ClapApp::new(crate_name!())
         .version(crate_version!())
         .global_setting(clap_color_setting)
         .global_setting(AppSettings::DeriveDisplayOrder)
@@ -83,16 +83,16 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
             .help("Adds a trailing timestamp.")
             .long_help("Adds a timestamp to the end of the pattern using the time format
                         configured in the settings (defaults to : [%H:%M:%S].")
-        )
-        .arg(
+        ).arg(
             Arg::with_name("n")
             .short("n")
             .long("no-newline")            
             .help("Supress new line after the generated title.")
             .long_help("Prevents writing a carriage return after generating the title.")
-        )
-        .subcommand(
-            SubCommand::with_name("templates")
+        );
+
+        
+        let mut templates_subcmd =  SubCommand::with_name("templates")
                 .about("Modify the templates configuration")         
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(              
@@ -121,7 +121,7 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("open")
+                    SubCommand::with_name("edit")
                         .arg(Arg::with_name("template")
                             .required(true)
                             .takes_value(true)
@@ -134,8 +134,9 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                             in the platform's default text editor. If the template does not exist the user is prompted \
                             to create a new one using a default template structure.",
                         ),
-                )
-                .subcommand(
+                );
+
+        templates_subcmd = templates_subcmd.subcommand(
                     SubCommand::with_name("remove")
                         .alias("rm")
                         .arg(Arg::with_name("template")
@@ -148,22 +149,27 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
                             "Removes the given template in \
                             the templates directory (default: the templates folder inside configuration directory).",
                         ),
-                )
-                .subcommand(
-                    SubCommand::with_name("add")
-                        .arg(Arg::with_name("url")
-                            .required(true)
-                            .takes_value(true)
-                            .multiple(true)
-                            .help("The URL of template to add")
-                            .index(1))                                            
-                        .help("Downloads & install the template from the given URL.")
-                        .about(
-                            "Downloads the template in the specified URL and installs it in \
-                            the templates directory (default: the templates folder inside configuration directory).",
-                        ),
-                )
         );
+        
+        #[cfg(feature = "fetcher")]
+        {
+            templates_subcmd = templates_subcmd.subcommand(
+                SubCommand::with_name("add")
+                    .arg(Arg::with_name("url")
+                        .required(true)
+                        .takes_value(true)
+                        .multiple(true)
+                        .help("The URL of template to add")
+                        .index(1))                                            
+                    .help("Downloads & install the template from the given URL.")
+                    .about(
+                        "Downloads the template in the specified URL and installs it in \
+                        the templates directory (default: the templates folder inside configuration directory).",
+                    ),
+            );
+        }
+
+        app = app.subcommand(templates_subcmd);
 
         app
 }

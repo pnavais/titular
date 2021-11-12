@@ -11,6 +11,7 @@ pub struct ItemStyler {}
 
 impl<'a> ItemStyler {
 
+    /// Performs the transform operation of a single item using the supplied context data and maximum terminal width
     pub fn style(item_name: &'a mut String, transform: &Transform, context: &'a FallbackMap<String, String>, max_pad_length: usize) -> usize {        
         let mut excess = 0;
         if transform.operator == "+" { *item_name = format!("{}{}", item_name, transform.value); }
@@ -30,6 +31,8 @@ impl<'a> ItemStyler {
         excess
     }
 
+    /// Performs a surround operation by applying the configured surround start/end characters
+    /// to the given input text.
     pub fn surround(txt: &mut String, context: &'a FallbackMap<String, String>) {
         let s_start = context.get(&"surround_start".to_owned()).or(context.get(&"defaults.surround_start".to_owned())).unwrap();
         let s_end = context.get(&"surround_end".to_owned()).or(context.get(&"defaults.surround_end".to_owned())).unwrap();
@@ -38,6 +41,9 @@ impl<'a> ItemStyler {
         }
     }
 
+    /// Pads a given text to the maxium length specified and truncates
+    /// in its boundaries in case the pattern exceeds the final length 
+    /// after padding.
     fn pad(txt: &'a mut String, max_length: usize) -> &'a String {        
         let pattern = txt.to_owned();
 

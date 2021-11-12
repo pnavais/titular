@@ -14,6 +14,7 @@ pub enum ConfigType {
 pub enum Error {
     #[error(transparent)]
     Io(#[from] ::std::io::Error),
+    #[cfg(feature = "fetcher")]
     #[error(transparent)]
     ClientError(#[from] ::reqwest::Error),     
     #[error("unable to parse {location} file {file:?}. Cause : {cause}")]

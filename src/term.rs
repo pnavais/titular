@@ -22,14 +22,17 @@ impl TermSize {
         }
     }
 
+    /// Retrieves the stored terminal width
     pub fn get_term_width(&self) -> usize {
         self.width
     }
 
+    /// Retrieves the stored terminal height
     pub fn get_term_height(&self) -> usize {
         self.height
     }
 
+    /// Retrieves the current terminal width
     pub fn get_current_witdh() -> usize {
         if let Some((w, _h)) = term_size::dimensions() {
             w

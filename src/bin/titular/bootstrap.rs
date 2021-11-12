@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::path::PathBuf;
-use chrono::Local;
 use std::io::prelude::*;
 
 pub use titular:: {
@@ -44,6 +43,8 @@ impl BootStrap {
         Ok(BootStrap { config: parse_main_config()? })
     }
 
+    /// Retrieves the templates directory from 
+    /// the main configuration interpolating environment variables if needed
     pub fn template_dir(&self) -> Result<PathBuf> {        
         let template_dir = match shellexpand::env(&self.config.templates.directory) {
             Ok(dir) => dir.as_ref().to_owned(),
@@ -57,6 +58,7 @@ impl BootStrap {
     }
 }
 
+/// Creates the default main configuration file in the config directory
 fn create_default_config(config_file: &PathBuf) -> Result<String> {   
     let parent_dir = config_file.parent().ok_or(Error::ConfigError(config_file.to_string_lossy().into_owned()))?;
     std::fs::create_dir_all(parent_dir)?;
@@ -66,6 +68,7 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
     Ok(String::from(config_data))
 }
 
+/// Process the main configuration file retrieving the associated `MainConfig` structure
 pub fn parse_main_config() -> Result<MainConfig> {
     let conf_file = &PROJECT_DIRS.config_dir().clone().join(DEFAULT_CONF_FILE);
     let toml_data = match config_parse(conf_file) {
@@ -76,16 +79,10 @@ pub fn parse_main_config() -> Result<MainConfig> {
     };
 
     let res : std::result::Result<MainConfig, ::toml::de::Error> = toml::from_str(&toml_data);
-    let mut main_config = match res {
-        Ok(config) => config,
+    let main_config = match res {
+        Ok(mut config) => { config.init(); config },
         Err(e) => return Err(Error::SerdeTomlError{location: ConfigType::MAIN, file: String::from(DEFAULT_CONF_FILE), cause: e.to_string()}),
     };
-    
-    // Keep defaults as vars
-    main_config.vars.insert("defaults.fill_char".to_owned(), main_config.defaults.fill_char.to_owned());
-    main_config.vars.insert("defaults.width".to_owned(), main_config.defaults.width.to_owned());
-    main_config.vars.insert("defaults.surround_start".to_owned(), main_config.defaults.surround_start.to_owned());
-    main_config.vars.insert("defaults.surround_end".to_owned(), main_config.defaults.surround_end.to_owned());
-    main_config.vars.insert("time".to_owned(), Local::now().format(&main_config.defaults.time_format).to_string());
+
     Ok(main_config)
 }

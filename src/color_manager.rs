@@ -18,6 +18,8 @@ use ansi_term::Colour::*;
 
 impl ColorManager {
 
+    /// Formats the given string using a foreground/background color supplied and extracting color
+    /// configuration from the given fallback map
     pub fn format<'a>(colours: &FallbackMap<String, String>, txt: &'a str, color_name: &str, is_bg: bool) -> String {
         match ColorManager::get_style(colours, color_name) {
             Some(c) => {
@@ -29,6 +31,11 @@ impl ColorManager {
         }
     }
 
+    /// Process the colour style supplied in one of the following variants supported by the 
+    /// ansi_term crate : 
+    /// - RGB(r,g,b) : A colour specified using the RGB notation
+    /// - FIXED(num) : A colour specified in fixed terms
+    /// - NAME(name) : The name of the colour
     fn get_style(colours: &FallbackMap<String, String>, color_name: &str) -> Option<Colour> {
         match colours.get(&color_name.to_string()) {
             Some(c) => {                
@@ -57,6 +64,7 @@ impl ColorManager {
         
     }
 
+    /// List of colours supported by the ansi_term crate
     fn to_colour_name(colour_name: &str) -> Option<Colour> {
         let colour = colour_name.to_uppercase();
         match &*colour {

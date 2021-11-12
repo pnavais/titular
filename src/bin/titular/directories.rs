@@ -14,7 +14,7 @@ pub struct ProjectDirs {
 impl ProjectDirs {
     fn new() -> Option<ProjectDirs> {
 
-        // Checks whether or not $TITULAR_CONFIG_DIR exists. If it doesn't, set our config dir
+        // Checks whether or not $TITULAR_CONFIG_DIR exists. If it doesn't, set config dir
         // to our system's default configuration home.
         let config_dir =
             if let Some(config_dir_op) = env::var_os("TITULAR_CONFIG_DIR").map(PathBuf::from) {

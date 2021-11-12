@@ -45,12 +45,16 @@ pub struct TemplateFormatter<'a> {
     main_config: &'a MainConfig,
 }
 
+/// Default template formatter implementation. Process each line in the template pattern
+/// separately and thus only provides backward referencing. 
 impl<'a> TemplateFormatter<'a> {
     
     pub fn new(main_config: &'a MainConfig) -> Self {
         TemplateFormatter { main_config }
     }
 
+    /// Formats the given template pattern using a configured context by spliting it line
+    /// by line.
     pub fn format(&self, context: &Context, template_config: &TemplateConfig) -> Result<bool> {        
         let mut result = Ok(true);
 
@@ -69,6 +73,9 @@ impl<'a> TemplateFormatter<'a> {
         result
     }
 
+    /// Formats a line in the pattern in a 2-step operations. First loop processes normal capture groups,
+    /// second loop processes remaining groups  needing padding/fiting since those operations need to know 
+    /// remaining space to render properly.
     pub fn format_line(&self, fallback_map: &FallbackMap<String, String>, pattern: &str, max_term_size: usize, previous_line_size: &mut usize) -> Result<bool> {        
         let mut line = pattern.to_owned();
 
@@ -96,6 +103,8 @@ impl<'a> TemplateFormatter<'a> {
         Ok(true)
     }
 
+    /// formats the items in the given line. Accounts for the remaining space left and also considers
+    /// the previous line size for fiting operations.
     fn format_items(&self, items: &mut String, context: &FallbackMap<String, String>, apply_padding: bool, max_pad_length: usize, space_left: &mut usize, previous_line_size: &usize) -> Result<ResolveStats> {               
         let mut num_groups_pad = 0;
         let mut current_length = 0;
@@ -132,6 +141,7 @@ impl<'a> TemplateFormatter<'a> {
         Ok(ResolveStats { current_length, num_groups_pad})
     }
 
+    /// Retrieves the list of transforms (i.e. rendering operations) specifies for the given item
     fn get_transforms(&self, item_group: &'a str, has_padding: &mut bool) -> Vec<Transform> {
         let mut transform_set: HashSet<Transform> = HashSet::new();
             OP_REGEX.captures_iter(item_group).for_each(|m| {                
@@ -147,6 +157,7 @@ impl<'a> TemplateFormatter<'a> {
         transform_list
     }
 
+    /// Formats a single item in the group of items extracted from the line.
     fn format_item(&self, context: &'a FallbackMap<String, String>, var_content: &VarContent, max_pad_length: usize, previous_line_size: &usize) -> FormattedItem {        
         // Try to resolve the variable using the context or take it from the template if not available
         let item_ctx = context.get(&var_content.item.to_owned());
@@ -184,6 +195,8 @@ impl<'a> TemplateFormatter<'a> {
         FormattedItem { value: item_name, length: item_length }
     }
 
+    /// Computes the maximum terminal width allowed for rendering. 
+    /// The configured width ratio is used to restrict actual usage.
     fn compute_max_term_size(&self, context: &'a FallbackMap<String, String>) -> Result<usize> {
         let perc_spec = context.get(&"width".to_owned()).or(Some(&self.main_config.defaults.width)).unwrap();
         let percentage = match perc_spec.parse::<usize>() {
@@ -199,6 +212,7 @@ impl<'a> TemplateFormatter<'a> {
         Ok(TERM_SIZE.get_term_width() * percentage / 100)
     }
 
+    /// Adds a trailing time pattern to a given line in the template
     fn add_time(&self, line: &mut String) {        
         line.push_str(&self.main_config.defaults.time_pattern);
     }
