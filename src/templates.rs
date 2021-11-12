@@ -1,7 +1,7 @@
 use std::io::{stdin, stdout, Write};
 
 use glob::glob;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use ansi_term::Colour::{ Red, Yellow, Green };
 #[cfg(feature = "fetcher")]
 use async_std::task;
