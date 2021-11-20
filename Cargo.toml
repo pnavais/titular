@@ -64,7 +64,7 @@ features = ["suggestions", "color", "wrap_help"]
 version = "0.11.6"
 optional = true
 default-features = false
-features = ["stream"]
+features = ["stream", "native-tls"]
 
 [dependencies.async-std]
 version = "1.10.0"

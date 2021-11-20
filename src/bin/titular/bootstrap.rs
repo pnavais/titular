@@ -29,7 +29,7 @@ static DEFAULT_CONF: &str = "[defaults]\n\
                             space        = \" \"\n\n\
                             [templates]\n\
                             directory    = '${templates_dir}'\n\
-                            default      = \"Basic\"\n";
+                            default      = \"basic\"\n";
 
 static DEFAULT_CONF_FILE: &str = "titular.conf";
 
