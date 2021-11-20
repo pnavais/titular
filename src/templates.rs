@@ -287,13 +287,13 @@ impl TemplateWriter {
         let mut template = DEFAULT_TEMPLATE.replacen("@name", &file_name, 1);
         
         let author = match config.vars.get(&"username".to_owned()) {
-            Some(u) => u.to_owned(),
-            None => config.defaults.username.to_owned(),
+            Some(u) => u,
+            None => &config.defaults.username,
         };
 
         let url = match config.vars.get(&"template_url".to_owned()) {
-            Some(u) => u.to_owned(),
-            None => config.defaults.templates_url.to_owned(),
+            Some(u) => u,
+            None => &config.defaults.templates_url,
         };
 
         template = template.replacen("@author", &author, 1);

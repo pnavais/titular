@@ -11,6 +11,13 @@ enum ContextValue {
 }
 
 #[derive(Debug)]
+pub enum Modifier {
+    INV,
+    NONE,
+}
+
+
+#[derive(Debug)]
 pub struct Context {
     context: HashMap<String, ContextValue>,   
 }
@@ -21,9 +28,8 @@ impl Context {
         Context { context: HashMap::new() }
     }
 
-    /// Insert a single value in the context specified by the given key
     pub fn insert<S: AsRef<str>>(&mut self, key: S, value: S) {
-        self.context.insert(String::from(key.as_ref()), ContextValue::String(String::from(value.as_ref())));
+        self.context.insert(String::from(key.as_ref()), ContextValue::String(value.as_ref().to_owned()));
     }
     
     /// Checks whether the context provides the given key
@@ -42,7 +48,7 @@ impl Context {
     }
 
     /// Inserts a list of values for the given key
-    pub fn insert_many<S: AsRef<str>>(&mut self, key: S, values: Vec<String>) {        
+    pub fn insert_many<S: AsRef<str>>(&mut self, key: S, values: Vec<String>) {
         self.context.insert(String::from(key.as_ref()), ContextValue::VecOfString(values));
     }
 
@@ -58,10 +64,10 @@ impl Context {
     }
 
     /// Retrieves all values for a given key (if multiple), or empty otherwise
-    pub fn get_all<S: AsRef<str>>(&self, name: S) -> Option<&Vec<String>> {
+    pub fn get_all<S: AsRef<str>>(&self, name: S) -> Option<Vec<String>> {
         match self.context.get(name.as_ref()) {
             Some(ContextValue::String(_)) => None,
-            Some(ContextValue::VecOfString(v)) => Some(v),
+            Some(ContextValue::VecOfString(v)) => Some(v.iter().map(|x| x.to_owned()).collect()),
             None => None,
         }   
     }

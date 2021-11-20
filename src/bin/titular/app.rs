@@ -47,7 +47,7 @@ impl App {
         if matches.is_present("list") {
             controller.list();
         } else if matches.is_present("edit") {
-            controller.open(matches.subcommand_matches("open").unwrap().value_of("template").unwrap())?;
+            controller.open(matches.subcommand_matches("edit").unwrap().value_of("template").unwrap())?;
         } else if matches.is_present("create") {
             controller.create(matches.subcommand_matches("create").unwrap().value_of("template").unwrap())?;
         } else if matches.is_present("remove") {
@@ -86,11 +86,14 @@ impl App {
         if self.matches.is_present("width") {
             context.insert("width", self.matches.value_of("width").unwrap());
         }
-        if self.matches.is_present("n") {            
+        if self.matches.is_present("no-newline") {            
             context.insert("skip-newline", "true");
         }
         if self.matches.is_present("with-time") {
             context.insert("with-time", "true");
+        }
+        if self.matches.is_present("hide") {
+            context.insert("hide", "true");
         }
         
         Ok(context)

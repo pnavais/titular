@@ -84,11 +84,17 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
             .long_help("Adds a timestamp to the end of the pattern using the time format
                         configured in the settings (defaults to : [%H:%M:%S].")
         ).arg(
-            Arg::with_name("n")
+            Arg::with_name("no-newline")
             .short("n")
             .long("no-newline")            
             .help("Supress new line after the generated title.")
             .long_help("Prevents writing a carriage return after generating the title.")
+        ).arg(
+            Arg::with_name("hide")
+            .short("h")
+            .long("hide")
+            .help("Hide all items flagged as invisible in the pattern.")
+            .long_help("Prevents writing the items flagged as invisible but taking into account their width for padding purposes.")
         );
 
         

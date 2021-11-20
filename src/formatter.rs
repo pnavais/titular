@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VAR_REGEX: Regex = Regex::new("([\\$|#|%])\\{([^}]+)\\}").unwrap();
-    static ref OP_REGEX: Regex = Regex::new("((:|\\+|\\-|\\*)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad|fit)))").unwrap();
+    static ref OP_REGEX: Regex = Regex::new("((:|\\+|\\-|\\*)((fg|bg){0,1}\\[([^\\]]+)\\]|(pad|fit|inv)))").unwrap();
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^\\-|^\\*]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
@@ -42,7 +42,7 @@ struct FormattedItem {
 }
 
 pub struct TemplateFormatter<'a> {
-    main_config: &'a MainConfig,
+    main_config: &'a MainConfig,    
 }
 
 /// Default template formatter implementation. Process each line in the template pattern
@@ -166,10 +166,11 @@ impl<'a> TemplateFormatter<'a> {
         let item_ctx = context.get(&var_content.item.to_owned());
         let mut item_name;
         let item_length;
+        let mut invisible = false;
 
         if item_ctx.is_some() {
             // Process the item operation
-            let item_val = if item_ctx.is_some() { item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
+            let item_val = if item_ctx.is_some() { &item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
             item_name = item_val.to_owned();
 
             let mut excess_length = 0;
@@ -182,6 +183,7 @@ impl<'a> TemplateFormatter<'a> {
             // Apply style
             for transform in &var_content.transforms {
                 excess_length += ItemStyler::style(&mut item_name, transform, context, if transform.operator == "fit" { *previous_line_size } else { max_pad_length });
+                invisible = if self.is_active(context, "hide") && transform.operator == "inv" { true } else { invisible };
             }
             
             // Surround (Postfix -> exclude text in style)
@@ -190,6 +192,9 @@ impl<'a> TemplateFormatter<'a> {
             }
             
             item_length = item_name.width() - excess_length;
+
+            // Hide text by effectively erasing it while keeping the length
+            item_name = if invisible { String::from("") } else { item_name };
         } else {
             item_name = String::from("");
             item_length = 0;
@@ -201,7 +206,8 @@ impl<'a> TemplateFormatter<'a> {
     /// Computes the maximum terminal width allowed for rendering. 
     /// The configured width ratio is used to restrict actual usage.
     fn compute_max_term_size(&self, context: &'a FallbackMap<String, String>) -> Result<usize> {
-        let perc_spec = context.get(&"width".to_owned()).or(Some(&self.main_config.defaults.width)).unwrap();
+        let default_str = String::from(&self.main_config.defaults.width);
+        let perc_spec = context.get(&"width".to_owned()).or(Some(&default_str)).unwrap();
         let percentage = match perc_spec.parse::<usize>() {
             Ok(n) => std::cmp::min(n,100),
             Err(_) => {
@@ -218,5 +224,12 @@ impl<'a> TemplateFormatter<'a> {
     /// Adds a trailing time pattern to a given line in the template
     fn add_time(&self, line: &mut String) {        
         line.push_str(&self.main_config.defaults.time_pattern);
+    }
+
+    fn is_active(&self, context: &FallbackMap<String, String>, key: &str) -> bool {
+        match context.get(&key.to_owned()) {
+            Some(v) => v == "true",
+            None => false,
+        }
     }
 }
