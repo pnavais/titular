@@ -9,4 +9,4 @@ f = "."
 sign = "✅"
 
 [pattern]
-data = "${m:fg[c2]}${f:pad}${m2:fg[yellow]}${sign:fg[green]}"
+data = "${m:fg[c2]}${f:pad}${m2:fg[yellow]}${sign:fg[green]:inv}"
