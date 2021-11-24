@@ -7,6 +7,7 @@ url     = "https://github.com/pnavais/titular"
 [vars]
 f = "."
 sign = "[FAIL]"
+sc = "red"
 
 [pattern]
-data = "${m:fg[c2]}${f:pad}${m2:fg[yellow]}${sign:fg[red]:inv}"
+data = "${m:fg[c2]}${f:pad}${m2:fg[yellow]}${sign:fg[sc]:inv}"
