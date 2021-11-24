@@ -87,4 +87,11 @@ impl MapProvider<String, String> for Context {
     fn resolve(&self, key: &String) -> Option<&String> {
         self.get(key)
     }
+
+    fn is_active(&self, key: &String) -> bool {
+        match self.get(key) {
+            Some(v) => v == "true",
+            None => false,
+        }
+    }
 }

@@ -95,6 +95,12 @@ pub fn build_app(interactive_output: bool) -> ClapApp<'static, 'static> {
             .long("hide")
             .help("Hide all items flagged as invisible in the pattern.")
             .long_help("Prevents writing the items flagged as invisible but taking into account their width for padding purposes.")
+        ).arg(
+            Arg::with_name("clear")
+            .short("c")
+            .long("clear")
+            .help("Clears the current line and moves the cursor at the beginning.")
+            .long_help("Erases the entire line the cursor is currently on then moves the cursor to the beginning of the line.")
         );
 
         

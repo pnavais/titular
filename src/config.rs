@@ -82,7 +82,14 @@ impl MapProvider<String, String> for MainConfig {
 
     fn resolve(&self, key: &String) -> Option<&String> {
         self.vars.get(key)
-    }    
+    }  
+    
+    fn is_active(&self, key: &String) -> bool {
+        match self.resolve(key) {
+            Some(v) => v == "true",
+            None => false,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -134,6 +141,13 @@ impl MapProvider<String, String> for TemplateConfig {
 
     fn resolve(&self, key: &String) -> Option<&String> {
         self.vars.get(key)
+    }
+    
+    fn is_active(&self, key: &String) -> bool {
+        match self.resolve(key) {
+            Some(v) => v == "true",
+            None => false,
+        }
     }
 }
 

@@ -95,6 +95,9 @@ impl App {
         if self.matches.is_present("hide") {
             context.insert("hide", "true");
         }
+        if self.matches.is_present("clear") {
+            context.insert("clear", "true");
+        }
         
         Ok(context)
     }

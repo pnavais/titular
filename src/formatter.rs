@@ -2,7 +2,7 @@ use crate::{
     config::{MainConfig, TemplateConfig},
     error::*,
     context::Context,
-    fallback_map::FallbackMap,
+    fallback_map::{FallbackMap,MapProvider},
     styler::ItemStyler,
     transform::Transform,
     term::TERM_SIZE,
@@ -20,6 +20,9 @@ lazy_static! {
     static ref ITEM_REGEX: Regex = Regex::new("^([^:|^\\+|^\\-|^\\*]+)").unwrap();
     static ref FILLER_REGEX: Regex = Regex::new("^f[\\d]*$").unwrap();
 }
+
+pub static KILL_LINE: &str = "\x1B[2K";
+pub static MOVE_CURSOR_TO_START: &str = "\x1B[0G";
 
 #[derive(Debug)]
 struct VarContent<'a> {
@@ -66,6 +69,9 @@ impl<'a> TemplateFormatter<'a> {
         // Compute max term size
         let max_term_size = self.compute_max_term_size(&fallback_map)?;
         let mut previous_line_size = 0;
+
+        // Handle pre actions on the terminal
+        self.prepare_term(context);
         
         for pattern in template_config.pattern.data.split("\n") {
             result = self.format_line(&fallback_map, pattern, max_term_size, &mut previous_line_size);
@@ -183,7 +189,7 @@ impl<'a> TemplateFormatter<'a> {
             // Apply style
             for transform in &var_content.transforms {
                 excess_length += ItemStyler::style(&mut item_name, transform, context, if transform.operator == "fit" { *previous_line_size } else { max_pad_length });
-                invisible = if self.is_active(context, "hide") && transform.operator == "inv" { true } else { invisible };
+                invisible = if context.is_active(&"hide".to_owned()) && transform.operator == "inv" { true } else { invisible };
             }
             
             // Surround (Postfix -> exclude text in style)
@@ -226,10 +232,10 @@ impl<'a> TemplateFormatter<'a> {
         line.push_str(&self.main_config.defaults.time_pattern);
     }
 
-    fn is_active(&self, context: &FallbackMap<String, String>, key: &str) -> bool {
-        match context.get(&key.to_owned()) {
-            Some(v) => v == "true",
-            None => false,
-        }
+    /// Perfoms some cleanup and preparation functions in the terminal before using it
+    fn prepare_term(&self, context: &Context) {
+        if context.is_active(&"clear".to_owned()) {
+            print!("{}{}", KILL_LINE, MOVE_CURSOR_TO_START);
+        }        
     }
 }

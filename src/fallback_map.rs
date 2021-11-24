@@ -2,6 +2,7 @@
 pub trait MapProvider<K,V> {
     fn contains(&self, key: &K) -> bool;
     fn resolve(&self, key: &K) -> Option<&V>;
+    fn is_active(&self, key: &K) -> bool;
 }
 
 pub struct FallbackMap<'a, K,V> {
@@ -35,6 +36,15 @@ impl <'a, K,V> FallbackMap<'a, K,V> {
         let mut res = false;
         for map in &self.maps {
             if map.contains(key) { res = true; break; }
+        }
+
+        res
+    }
+
+    pub fn is_active(&self, key: &K) -> bool {
+        let mut res = false;
+        for map in &self.maps {
+            if map.is_active(key) { res = true; break; }
         }
 
         res
