@@ -6,7 +6,7 @@ url     = "https://github.com/pnavais/titular"
 
 [vars]
 f  = "*"
-f2 = "*"
+f2 = "${f}"
 cl = "ca"
 cr = "cl"
 

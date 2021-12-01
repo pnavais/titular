@@ -169,7 +169,7 @@ impl<'a> TemplateFormatter<'a> {
     /// Formats a single item in the group of items extracted from the line.
     fn format_item(&self, context: &'a FallbackMap<String, String>, var_content: &VarContent, max_pad_length: usize, previous_line_size: &usize) -> FormattedItem {        
         // Try to resolve the variable using the context or take it from the template if not available
-        let item_ctx = context.get(&var_content.item.to_owned());
+        let item_ctx = self.get_item_name(context, &var_content.item);
         let mut item_name;
         let item_length;
         let mut invisible = false;
@@ -207,6 +207,24 @@ impl<'a> TemplateFormatter<'a> {
         }
         
         FormattedItem { value: item_name, length: item_length }
+    }
+
+    /// Retrieves the given item name from the context, in case the 
+    /// resolved entry refers to a variable it is queries recursively
+    /// until a terminal element is retrieved
+    fn get_item_name(&self,context: &'a FallbackMap<String, String>, item_name: &str) -> Option<&String> {
+        match context.get(&item_name.to_owned()) {
+            Some(v) => {
+                
+                let item_name = match VAR_REGEX.captures(v) {
+                    Some(i) => i.get(2).map_or("", |m| m.as_str()),
+                    None => return Some(v),
+                };
+                return self.get_item_name(context, item_name)
+
+            },
+            None => None,
+        }
     }
 
     /// Computes the maximum terminal width allowed for rendering. 

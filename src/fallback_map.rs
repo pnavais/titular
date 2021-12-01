@@ -1,4 +1,3 @@
-
 pub trait MapProvider<K,V> {
     fn contains(&self, key: &K) -> bool;
     fn resolve(&self, key: &K) -> Option<&V>;
