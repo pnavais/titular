@@ -24,5 +24,5 @@ m7    = "100"
 [pattern]
 data = """\
 		${m:fg[c2]+[ ]}%{m2:fg[c3]}${space:pad}${error} ${m3:fg[m3c]} ${warn} ${m4:fg[m4c]} ${info} ${m5:fg[m5c]} ${ok} ${m6:fg[m6c]} ${m7:fg[m7c]}%\n\
-		${f:fg[c4]:pad}\n\
-	   """
+		${f:fg[c4]:pad}\
+		"""
