@@ -17,7 +17,7 @@ pub enum Modifier {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Context {
     context: HashMap<String, ContextValue>,   
 }

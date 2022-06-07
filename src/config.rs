@@ -11,7 +11,7 @@ use crate:: {
     fallback_map::MapProvider,
 };
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct MainConfig {    
     pub defaults: Defaults,
     #[serde(default)]
@@ -31,16 +31,6 @@ pub struct Defaults {
     pub surround_end: String,
     pub time_format: String,
     pub time_pattern: String,
-}
-
-impl Default for MainConfig {
-    fn default() -> MainConfig {
-        MainConfig {
-            defaults: Defaults::default(),
-            templates: Templates::default(),
-            vars: HashMap::new(),
-        }
-    }
 }
 
 impl Default for Defaults {

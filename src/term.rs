@@ -2,6 +2,7 @@ extern crate term_size;
 
 use lazy_static::lazy_static;
 
+#[derive(Default)]
 pub struct TermSize {
     width: usize,
     height: usize,

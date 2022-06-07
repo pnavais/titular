@@ -26,8 +26,7 @@ impl App {
         let interactive_output = atty::is(Stream::Stdout);
 
         Ok(App {
-            matches: Self::matches(interactive_output)?,
-            interactive_output: interactive_output,
+            matches: Self::matches(interactive_output)?, interactive_output,
         })
     }
 
@@ -66,7 +65,7 @@ impl App {
     fn build_context(&self) -> Result<Context> {
         let mut context = Context::new();
 
-        context.insert("template", self.matches.value_of("template").or(Some("")).unwrap());
+        context.insert("template", self.matches.value_of("template").unwrap_or(""));
         if self.matches.is_present("message") {                        
             context.insert_multi("m", self.matches.values_of("message").unwrap().map(|v| v.to_string()).collect());
         }
@@ -75,7 +74,7 @@ impl App {
         }
         if self.matches.is_present("key=value") {
             for v in self.matches.values_of("key=value").unwrap() {
-                let k: Vec<&str> = v.split("=").collect();
+                let k: Vec<&str> = v.split('=').collect();
                 if k.len()>1 {
                     context.insert(k[0], k[1]);
                 } else {
@@ -107,7 +106,7 @@ impl App {
     pub fn start(&self) -> Result<bool> {        
         // Parse the default config
         let bootstrap = BootStrap::new()?;
-        let controller = TemplatesController { input_dir:  bootstrap.template_dir()?, config: &bootstrap.get_config() };
+        let controller = TemplatesController { input_dir:  bootstrap.template_dir()?, config: bootstrap.get_config() };
         
         match self.matches.subcommand() {
             ("templates", Some(tpl_params)) => {
@@ -116,7 +115,7 @@ impl App {
             }
             _ => { 
                 let context = self.build_context()?;
-                let template_name = self.matches.value_of("template").or(Some(&bootstrap.get_config().templates.default)).unwrap();                                                
+                let template_name = self.matches.value_of("template").or_else(|| Some(&bootstrap.get_config().templates.default)).unwrap();                                                
                 controller.format(&context, template_name)?;
                 Ok(true)                
             }

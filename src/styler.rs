@@ -18,10 +18,10 @@ impl<'a> ItemStyler {
         else if transform.operator == "-" { *item_name = format!("{}{}", transform.value, item_name);  }
         else if transform.operator == "*" { ItemStyler::pad(item_name, transform.value.parse::<usize>().unwrap_or(1));  }
         else if transform.operator == "fg" || transform.operator == "bg"{
-            if item_name.len() > 0 {
+            if !item_name.is_empty() {
                 excess = item_name.width();
-                *item_name = ColorManager::format(&context, &item_name, transform.value, transform.operator == "bg");
-                excess = item_name.width().checked_sub(excess).unwrap_or(0);
+                *item_name = ColorManager::format(context, item_name, transform.value, transform.operator == "bg");
+                excess = item_name.width().saturating_sub(excess);
             }
         }
         else if transform.operator == "pad" || transform.operator == "fit" {
@@ -34,9 +34,9 @@ impl<'a> ItemStyler {
     /// Performs a surround operation by applying the configured surround start/end characters
     /// to the given input text.
     pub fn surround(txt: &mut String, context: &'a FallbackMap<String, String>) {
-        let s_start = context.get(&"surround_start".to_owned()).or(context.get(&"defaults.surround_start".to_owned())).unwrap();
-        let s_end = context.get(&"surround_end".to_owned()).or(context.get(&"defaults.surround_end".to_owned())).unwrap();
-        if txt.len() > 0 {
+        let s_start = context.get(&"surround_start".to_owned()).or_else(|| context.get(&"defaults.surround_start".to_owned())).unwrap();
+        let s_end = context.get(&"surround_end".to_owned()).or_else(|| context.get(&"defaults.surround_end".to_owned())).unwrap();
+        if !txt.is_empty() {
             *txt = format!("{}{}{}", s_start, txt, s_end);
         }
     }

@@ -1,7 +1,7 @@
 use std::io::{stdin, stdout, Write};
 
 use glob::glob;
-use std::path::PathBuf;
+use std::path::{ PathBuf, Path };
 use ansi_term::Colour::{ Red, Yellow, Green };
 #[cfg(feature = "fetcher")]
 use async_std::task;
@@ -69,7 +69,7 @@ impl <'a> TemplatesController<'a> {
         if !path.is_empty() {
             match edit::edit_file(&template) {
                 Ok(_) => Ok(()),
-                Err(e) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
+                Err(e) => Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
             }
         } else {
             Ok(())
@@ -103,14 +103,14 @@ impl <'a> TemplatesController<'a> {
         }
         
         let template_config = self.parse(template_name)?;
-        TemplateFormatter::new(&self.config).format(&context, &template_config)
+        TemplateFormatter::new(self.config).format(context, &template_config)
     }
 
     #[cfg(feature = "fetcher")]
     /// Adds multiple templates by the name (if available in the remote repository) or URL.
     pub fn add(&self, urls: &Vec<String>) -> Result<()> {
         for url in urls {
-            self.add_template(&url)?;
+            self.add_template(url)?;
         }
         Ok(())
     }
@@ -140,7 +140,7 @@ impl <'a> TemplatesController<'a> {
             println!("\nTemplate \"{}\" added succesfully", Green.paint(template_name));
         }
 
-        return res;
+        res
     }
 
     #[cfg(feature = "fetcher")]
@@ -152,7 +152,7 @@ impl <'a> TemplatesController<'a> {
             Ok(u) => { 
                 let last_slash_idx = u.path().rfind('/').unwrap_or(0);
                 let (_, filename) = u.path().split_at(last_slash_idx);
-                *template_name = filename.replacen("/", "", 1);
+                *template_name = filename.replacen('/', "", 1);
 
                 if template_name.is_empty() { 
                     print!("Template name not detected. Please specify it : ");
@@ -186,7 +186,7 @@ impl <'a> TemplatesController<'a> {
                 
                 if input == "y" || input == "yes" {
                     break;
-                } else if input == "n" || input == "no" || input.len() <= 0 {
+                } else if input == "n" || input == "no" || input.is_empty() {
                     return None;
                 }
             }
@@ -220,15 +220,15 @@ impl <'a> TemplatesController<'a> {
         let path = self.get_template_file(name);
         let toml_data = match config_parse(&self.input_dir.clone().join(&path)) {
             Ok(data) => data,
-            Err(Error::Io(e)) if e.kind() == ::std::io::ErrorKind::NotFound => return Err(Error::TemplateNotFound{file: String::from(path), cause: e.to_string() }),
-            Err(Error::Io(e)) => return Err(Error::TemplateReadError{ file: String::from(path), cause: e.to_string() }),
+            Err(Error::Io(e)) if e.kind() == ::std::io::ErrorKind::NotFound => return Err(Error::TemplateNotFound{file: path, cause: e.to_string() }),
+            Err(Error::Io(e)) => return Err(Error::TemplateReadError{ file: path, cause: e.to_string() }),
             Err(e) => return Err(e),
         };
 
         let res : std::result::Result<TemplateConfig, ::toml::de::Error> = toml::from_str(&toml_data);
         let template_config = match res {
             Ok(config) => config,
-            Err(e) => return Err(Error::SerdeTomlError{ location: ConfigType::TEMPLATE, file: String::from(path), cause: e.to_string()}),
+            Err(e) => return Err(Error::SerdeTomlError{ location: ConfigType::TEMPLATE, file: path, cause: e.to_string()}),
         };        
 
         Ok(template_config)
@@ -250,7 +250,7 @@ impl <'a> TemplatesController<'a> {
                     let _ = stdout().flush();
                     stdin().read_line(&mut input).expect("error: unable to read user input");
                     input = input.trim().to_lowercase();
-                    if input == "y" || input == "yes" || input.len() <= 0 {
+                    if input == "y" || input == "yes" || input.is_empty() {
                         break;
                     } else if input == "n" || input == "no" {
                         return Ok(("".to_owned(), PathBuf::new(), false));
@@ -283,7 +283,7 @@ impl TemplateWriter {
     
     /// Writes a new template file using default and automatically computed contents (i.e. user name)
     fn write_new(file_path: &PathBuf, config: &MainConfig) -> Result<()> {        
-        let file_name = TemplateWriter::get_template_name(&file_path);
+        let file_name = TemplateWriter::get_template_name(file_path);
         let mut template = DEFAULT_TEMPLATE.replacen("@name", &file_name, 1);
         
         let author = match config.vars.get(&"username".to_owned()) {
@@ -296,8 +296,8 @@ impl TemplateWriter {
             None => &config.defaults.templates_url,
         };
 
-        template = template.replacen("@author", &author, 1);
-        template = template.replacen("@url", &url, 1);
+        template = template.replacen("@author", author, 1);
+        template = template.replacen("@url", url, 1);
         match std::fs::write(file_path, template) {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::TemplateWriteError(format!("Cannot write file {} -> {}", file_path.to_string_lossy(), e))),
@@ -305,9 +305,9 @@ impl TemplateWriter {
     }
 
     /// Retrieves the template name (without extension)
-    fn get_template_name(file_path: &PathBuf) -> String {
+    fn get_template_name(file_path: &Path) -> String {
         let file_name = file_path.file_name().map_or("@file_name".to_string(), |m| { 
-            m.to_string_lossy().as_ref().replacen(&format!("{}{}", ".", DEFAULT_EXT),  "", 1).to_owned() 
+            m.to_string_lossy().as_ref().replacen(&format!("{}{}", ".", DEFAULT_EXT),  "", 1)
         });        
 
         let mut c = file_name.chars();

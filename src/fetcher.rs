@@ -33,16 +33,16 @@ pub async fn download_file(url: &str, path: &PathBuf) -> Result<()> {
                     .progress_chars("#>-"));
                 pb.set_message(format!("Downloading {}", url));
 
-                let parent_dir = path.parent().ok_or(Error::from(format!("Failed to obtain config directory")))?;
+                let parent_dir = path.parent().ok_or_else(|| Error::from("Failed to obtain config directory"))?;
                 std::fs::create_dir_all(parent_dir)?;
-                let mut file = File::create(path).or(Err(Error::from(format!("Failed to create file '{}'", path.to_string_lossy()))))?;
+                let mut file = File::create(path).map_err(|_| Error::from(format!("Failed to create file '{}'", path.to_string_lossy())))?;
                 let mut downloaded: u64 = 0;
                 let mut stream = r.bytes_stream();
                 
                 while let Some(item) = stream.next().await {            
-                    let chunk = item.or(Err(Error::from(format!("Error while downloading file"))))?;
-                    file.write(&chunk)
-                        .or(Err(Error::from(format!("Error while writing to file"))))?;
+                    let chunk = item.map_err(|_| Error::from("Error while downloading file"))?;
+                    file.write_all(&chunk)
+                        .map_err(|_| Error::from("Error while writing to file"))?;
                     let new = min(downloaded + (chunk.len() as u64), total_size);
                     downloaded = new;
                     pb.set_position(new);
@@ -54,7 +54,7 @@ pub async fn download_file(url: &str, path: &PathBuf) -> Result<()> {
 
                 Ok(())
             } else {
-                Err(Error::TemplateDownloadError(format!("{}", path.file_name().and_then(|name| name.to_str()).unwrap()), format!("Error {}", r.status())))
+                Err(Error::TemplateDownloadError(path.file_name().and_then(|name| name.to_str()).unwrap().to_string(), format!("Error {}", r.status())))
             }
         },
         Err(e) => Err(Error::from(e)),

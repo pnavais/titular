@@ -4,8 +4,9 @@ pub trait MapProvider<K,V> {
     fn is_active(&self, key: &K) -> bool;
 }
 
+#[derive(Default)]
 pub struct FallbackMap<'a, K,V> {
-    maps: Vec<Box<&'a dyn MapProvider<K,V>>>,
+    maps: Vec<&'a dyn MapProvider<K,V>>,
 }
 
 impl <'a, K,V> FallbackMap<'a, K,V> {    
@@ -13,11 +14,11 @@ impl <'a, K,V> FallbackMap<'a, K,V> {
         FallbackMap { maps: Vec::new() }
     }
 
-    pub fn from(provider: Box<&'a dyn MapProvider<K,V>>) -> Self {
+    pub fn from(provider: &'a dyn MapProvider<K,V>) -> Self {
         FallbackMap { maps: vec![provider] }
     }
 
-    pub fn add(&mut self, provider: Box<&'a dyn MapProvider<K,V>>) -> &Self {
+    pub fn add(&mut self, provider: &'a dyn MapProvider<K,V>) -> &Self {
         self.maps.push(provider);
         self
     }

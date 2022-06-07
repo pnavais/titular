@@ -54,18 +54,18 @@ impl BootStrap {
     }
 
     pub fn get_config(&self)  -> &MainConfig {
-        return &self.config;
+        &self.config
     }
 }
 
 /// Creates the default main configuration file in the config directory
 fn create_default_config(config_file: &PathBuf) -> Result<String> {   
-    let parent_dir = config_file.parent().ok_or(Error::ConfigError(config_file.to_string_lossy().into_owned()))?;
+    let parent_dir = config_file.parent().ok_or_else(|| Error::ConfigError(config_file.to_string_lossy().into_owned()))?;
     std::fs::create_dir_all(parent_dir)?;
     let templates_dir = parent_dir.join("templates").to_string_lossy().into_owned();
     let config_data = DEFAULT_CONF.replacen("${templates_dir}", &templates_dir, 1);
     File::create(&config_file)?.write_all(config_data.as_bytes())?;
-    Ok(String::from(config_data))
+    Ok(config_data)
 }
 
 /// Process the main configuration file retrieving the associated `MainConfig` structure

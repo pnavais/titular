@@ -62,9 +62,9 @@ impl<'a> TemplateFormatter<'a> {
         let mut result = Ok(true);
 
         // Create a fallback map
-        let mut fallback_map: FallbackMap<String, String> = FallbackMap::from(Box::new(context));
-        fallback_map.add(Box::new(template_config));
-        fallback_map.add(Box::new(self.main_config));
+        let mut fallback_map: FallbackMap<String, String> = FallbackMap::from(context);
+        fallback_map.add(template_config);
+        fallback_map.add(self.main_config);
 
         // Compute max term size
         let max_term_size = self.compute_max_term_size(&fallback_map)?;
@@ -73,7 +73,7 @@ impl<'a> TemplateFormatter<'a> {
         // Handle pre actions on the terminal
         self.prepare_term(context);
         
-        for pattern in template_config.pattern.data.split("\n") {
+        for pattern in template_config.pattern.data.split('\n') {
             result = self.format_line(&fallback_map, pattern, max_term_size, &mut previous_line_size);
         }
         result
@@ -96,10 +96,10 @@ impl<'a> TemplateFormatter<'a> {
         // Resolve normal groups        
         let resolve_stats = self.format_items(&mut line, fallback_map, false, 0, &mut space_left,  previous_line_size)?;
         *previous_line_size = if resolve_stats.current_length == 0 { *previous_line_size } else { previous_line_size.checked_sub(resolve_stats.current_length).unwrap_or(0) };        
-        let max_pad_length = (max_term_size.checked_sub(fixed_length + resolve_stats.current_length)).unwrap_or(0) / std::cmp::max(resolve_stats.num_groups_pad,1);
+        let max_pad_length = (max_term_size.saturating_sub(fixed_length + resolve_stats.current_length)) / std::cmp::max(resolve_stats.num_groups_pad,1);
                         
         // Resolve padding groups
-        let resolve_stats_padding = self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, &previous_line_size)?;
+        let resolve_stats_padding = self.format_items(&mut line, fallback_map, true, max_pad_length, &mut space_left, previous_line_size)?;
 
         if !line.is_empty() {
             print!("{}{}", line, if !fallback_map.contains(&"skip-newline".to_owned()) { "\n" } else { ""});
@@ -131,7 +131,7 @@ impl<'a> TemplateFormatter<'a> {
                 transforms: self.get_transforms(item_group, &mut has_padding),
             };
             
-            if (!apply_padding && !has_padding) || apply_padding {                   
+            if apply_padding || !has_padding {                   
                 let excess = if max_pad_length+1 == *space_left { 1 } else { 0 };
                 let item = self.format_item(context, &var_content, max_pad_length + excess, previous_line_size);
                 
@@ -155,7 +155,7 @@ impl<'a> TemplateFormatter<'a> {
         let mut transform_set: HashSet<Transform> = HashSet::new();
             OP_REGEX.captures_iter(item_group).for_each(|m| {                
                 let t = Transform {
-                    operator: m.get(6).or(m.get(4)).or(m.get(2)).map(|s| s.as_str()).unwrap(),
+                    operator: m.get(6).or_else(|| m.get(4)).or_else(|| m.get(2)).map(|s| s.as_str()).unwrap(),
                     value: m.get(5).map_or("", |s| s.as_str()),
                 };
                 *has_padding = *has_padding || t.operator == "pad" || t.operator == "fit";
@@ -169,14 +169,14 @@ impl<'a> TemplateFormatter<'a> {
     /// Formats a single item in the group of items extracted from the line.
     fn format_item(&self, context: &'a FallbackMap<String, String>, var_content: &VarContent, max_pad_length: usize, previous_line_size: &usize) -> FormattedItem {        
         // Try to resolve the variable using the context or take it from the template if not available
-        let item_ctx = self.get_item_name(context, &var_content.item);
+        let item_ctx = self.get_item_name(context, var_content.item);
         let mut item_name;
         let item_length;
         let mut invisible = false;
 
         if item_ctx.is_some() {
             // Process the item operation
-            let item_val = if item_ctx.is_some() { &item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
+            let item_val = if item_ctx.is_some() { item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
             item_name = item_val.to_owned();
 
             let mut excess_length = 0;
@@ -220,7 +220,7 @@ impl<'a> TemplateFormatter<'a> {
                     Some(i) => i.get(2).map_or("", |m| m.as_str()),
                     None => return Some(v),
                 };
-                return self.get_item_name(context, item_name)
+                self.get_item_name(context, item_name)
 
             },
             None => None,
@@ -231,7 +231,7 @@ impl<'a> TemplateFormatter<'a> {
     /// The configured width ratio is used to restrict actual usage.
     fn compute_max_term_size(&self, context: &'a FallbackMap<String, String>) -> Result<usize> {
         let default_str = String::from(&self.main_config.defaults.width);
-        let perc_spec = context.get(&"width".to_owned()).or(Some(&default_str)).unwrap();
+        let perc_spec = context.get(&"width".to_owned()).unwrap_or(&default_str);
         let percentage = match perc_spec.parse::<usize>() {
             Ok(n) => std::cmp::min(n,100),
             Err(_) => {

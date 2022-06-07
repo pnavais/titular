@@ -46,7 +46,7 @@ impl ColorManager {
                             groups.get(3).map_or("", |m| m.as_str()).parse().unwrap()))
                 } else if FNAME_REGEX.is_match(c) {                    
                     let groups = FNAME_REGEX.captures(c).unwrap();
-                    let operator = groups.get(2).or(groups.get(4)).map_or("", |m| m.as_str()).to_uppercase();                       
+                    let operator = groups.get(2).or_else(|| groups.get(4)).map_or("", |m| m.as_str()).to_uppercase();                       
                     if operator == "FIXED" {
                         Some(Fixed(groups.get(3).map_or("", |m| m.as_str()).parse().unwrap()))
                     } else if operator == "NAME" {
