@@ -174,10 +174,10 @@ impl<'a> TemplateFormatter<'a> {
         let item_length;
         let mut invisible = false;
 
-        if item_ctx.is_some() {
-            // Process the item operation
-            let item_val = if item_ctx.is_some() { item_ctx.unwrap() } else { if var_content.is_filler { &self.main_config.defaults.fill_char } else { "" } };
-            item_name = item_val.to_owned();
+        if let Some(value) = item_ctx {
+
+            // Process item option
+            item_name = value.to_owned();
 
             let mut excess_length = 0;
 
@@ -202,8 +202,8 @@ impl<'a> TemplateFormatter<'a> {
             // Hide text by effectively erasing it while keeping the length
             item_name = if invisible { String::from("") } else { item_name };
         } else {
-            item_name = String::from("");
-            item_length = 0;
+            item_name = if var_content.is_filler { self.main_config.defaults.fill_char.clone() } else { String::from("") };
+            item_length = item_name.width();
         }
         
         FormattedItem { value: item_name, length: item_length }
