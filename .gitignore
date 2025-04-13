@@ -1,0 +1,31 @@
+# Rust-specific ignores
+/target/          # Build artifacts
+**/*.rs.bk        # Backup files (common in some editors)
+Cargo.lock        # Only include if this is NOT a library (see note below)
+
+# macOS system files
+.DS_Store
+.Spotlight-V100
+.Trashes
+._*
+
+# IDE/Editor specific
+.idea/
+.vscode/
+*.swp
+*~
+*.sublime-workspace
+*.sublime-project
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Debug files
+*.log
+*.tmp
+*.pid
+
+# Dependency directories
+node_modules/     # If using Node.js alongside Rust
