@@ -1,4 +1,4 @@
-# Titular
+# Titular (WIP)
 
 A command-line tool to display fancy titles in your terminal with syntax highlighting and theme support.
 
