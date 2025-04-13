@@ -1,5 +1,1 @@
-#[cfg(feature = "display")]
-include!("build/build_display.rs");
-
-#[cfg(not(feature = "display"))]
-fn main() {}
+include!("build/build_assets.rs");
