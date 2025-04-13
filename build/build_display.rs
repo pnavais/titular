@@ -92,6 +92,13 @@ impl ThemeSetExt for ThemeSet {
         Ok(())
     }
 
+    /// Loads a theme from the given directory
+    ///
+    /// # Arguments
+    /// * `dir` - The directory to load the theme from
+    ///
+    /// # Returns
+    /// A `Result` indicating success or failure.
     fn load_theme(&mut self, dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         build_println!(
             "Loading Sublime theme from {}",
@@ -107,6 +114,13 @@ impl ThemeSetExt for ThemeSet {
         Ok(())
     }
 
+    /// Loads a color scheme from the given directory
+    ///
+    /// # Arguments
+    /// * `dir` - The directory to load the color scheme from
+    ///
+    /// # Returns
+    /// A `Result` indicating success or failure.
     fn load_color_scheme(&mut self, dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         build_println!(
             "Loading Sublime color scheme from {}",
