@@ -62,7 +62,12 @@ fn setup_pager() {
 /// # Returns
 /// A `Result` indicating success or failure.
 fn check_pager(context: &FallbackMap<String, String>, path: &Path) -> Result<()> {
-    let display = Display::from_str(context.get_str_ref_or("defaults.display", "raw"))?;
+    let display = Display::from_str(
+        context
+            .get_str_ref("mode")
+            .or_else(|| context.get_str_ref("defaults.display"))
+            .unwrap_or("raw"),
+    )?;
 
     match display {
         Display::Raw => {}
@@ -155,7 +160,12 @@ fn display_fancy(content: &str, context: &FallbackMap<String, String>) -> Result
 pub fn display_template(path: &Path, context: &FallbackMap<String, String>) -> Result<()> {
     // Load the template content
     let content = fs::read_to_string(path)?;
-    let display = Display::from_str(context.get_str_ref_or("defaults.display", "raw"))?;
+    let display = Display::from_str(
+        context
+            .get_str_ref("mode")
+            .or_else(|| context.get_str_ref("defaults.display"))
+            .unwrap_or("raw"),
+    )?;
 
     // Setup pager if needed
     if !matches!(display, Display::Fancy) || content.lines().count() > TERM_SIZE.get_term_height() {

@@ -191,17 +191,18 @@ fn build_show_command() -> Command {
                     using the platform's default pager.",
     );
 
+    let mut cmd = show_cmd;
+    cmd = cmd.arg(
+        arg!(-m --mode <VALUE> "Sets the display mode")
+            .long_help("Explicitly specify the display mode to use."),
+    );
+
     #[cfg(feature = "display")]
     {
-        let mut cmd = show_cmd;
         cmd = cmd.arg(
             arg!(-t --theme <VALUE> "Sets the syntax highlighting theme")
                 .long_help("Explicitly specify the syntax highlighting theme to use."),
         );
-        cmd
     }
-    #[cfg(not(feature = "display"))]
-    {
-        show_cmd
-    }
+    cmd
 }
