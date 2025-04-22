@@ -35,6 +35,8 @@ pub enum Error {
         file: String,
         cause: String,
     },
+    #[error("JSON parsing error: {0}")]
+    JsonError(String),
     #[cfg(feature = "display")]
     #[error(transparent)]
     SyntectError(#[from] ::syntect::Error),
@@ -83,6 +85,12 @@ impl From<&'static str> for Error {
 impl From<String> for Error {
     fn from(s: String) -> Self {
         Error::Msg(s)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(error: serde_json::Error) -> Self {
+        Error::JsonError(error.to_string())
     }
 }
 

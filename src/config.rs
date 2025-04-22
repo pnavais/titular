@@ -14,6 +14,9 @@ pub const DEFAULT_TEMPLATE_EXT: &str = ".tl";
 pub const DEFAULT_TEMPLATE_NAME: &str = "basic";
 pub const DEFAULT_THEME: &str = "base16-ocean.dark";
 
+#[cfg(feature = "fetcher")]
+pub const DEFAULT_REMOTE_REPO: &str = "github:pnavais/titular/templates";
+
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Display {
@@ -55,6 +58,8 @@ pub struct Defaults {
 pub struct Templates {
     pub directory: Option<String>,
     pub default: String,
+    #[cfg(feature = "fetcher")]
+    pub remote_repo: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -106,6 +111,8 @@ impl Default for Templates {
         Templates {
             directory: None,
             default: DEFAULT_TEMPLATE_NAME.to_string(),
+            #[cfg(feature = "fetcher")]
+            remote_repo: Some(DEFAULT_REMOTE_REPO.to_string()),
         }
     }
 }

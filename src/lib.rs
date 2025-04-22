@@ -25,15 +25,20 @@
 //! //    .unwrap();
 //! ```
 
+pub mod color_manager;
 pub mod config;
 pub mod context;
 pub mod controller;
+#[cfg(feature = "fetcher")]
+pub mod dispatcher;
 pub mod display;
 pub mod error;
 pub mod fallback_map;
 #[cfg(feature = "fetcher")]
 pub mod fetcher;
 pub mod formatter;
+#[cfg(feature = "fetcher")]
+pub mod github;
 pub mod log;
 pub mod reader;
 #[cfg(feature = "minimal")]

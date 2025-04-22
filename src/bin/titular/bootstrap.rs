@@ -2,7 +2,7 @@ use chrono::prelude::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
-use titular::config::DEFAULT_TEMPLATE_NAME;
+use titular::config::{DEFAULT_REMOTE_REPO, DEFAULT_TEMPLATE_NAME};
 
 pub use titular::{
     config::{parse as config_parse, MainConfig},
@@ -43,8 +43,26 @@ pub struct BootStrap {
 impl BootStrap {
     pub fn new() -> Result<Self> {
         Ok(BootStrap {
-            config: parse_main_config()?,
+            config: BootStrap::init()?,
         })
+    }
+
+    /// Initializes the application by setting up necessary handlers and configurations.
+    /// Currently sets up the Ctrl+C handler to restore cursor visibility when the program is interrupted.
+    ///
+    /// # Returns
+    /// A `Result` containing the main configuration.
+    pub fn init() -> Result<MainConfig> {
+        #[cfg(feature = "fetcher")]
+        {
+            if let Err(e) = ctrlc::set_handler(titular::utils::cleanup) {
+                return Err(Error::CommandError(format!(
+                    "Failed to set Ctrl+C handler: {}",
+                    e
+                )));
+            }
+        }
+        parse_main_config()
     }
 
     /// Retrieves the templates directory using the following order :
@@ -112,7 +130,7 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
     std::fs::create_dir_all(parent_dir)?;
     let templates_dir = parent_dir.join("templates").to_string_lossy().into_owned();
     let current_date: DateTime<Local> = Local::now();
-    let config_data = DEFAULT_CONF
+    let mut config_data = DEFAULT_CONF
         .replacen("${templates_dir}", &templates_dir, 1)
         .replacen("${date}", &current_date.to_string(), 1)
         .replacen("${default_template_name}", DEFAULT_TEMPLATE_NAME, 1)
@@ -124,6 +142,12 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
             "bat_or_pager",
             1,
         );
+
+    #[cfg(feature = "fetcher")]
+    {
+        config_data.push_str(&format!("remote_repo   = \"{}\"", DEFAULT_REMOTE_REPO));
+    }
+
     File::create(&config_file)?.write_all(config_data.as_bytes())?;
     Ok(config_data)
 }

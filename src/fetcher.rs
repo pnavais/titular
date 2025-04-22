@@ -2,7 +2,12 @@ pub struct TemplateFetcher;
 
 use std::{fmt::Write, io::Write as _, path::PathBuf};
 
-use crate::{config::DEFAULT_TEMPLATE_EXT, reader::TemplateReader, utils};
+use crate::{
+    config::DEFAULT_TEMPLATE_EXT,
+    dispatcher::{Dispatcher, URLDispatcher},
+    reader::TemplateReader,
+    utils::{self, create_backup, remove_backup, restore_backup},
+};
 
 use isahc::{
     config::{Configurable, RedirectPolicy},
@@ -38,22 +43,98 @@ impl TemplateFetcher {
     /// # Returns
     /// * `Result<bool>` - `Ok(true)` if the template was downloaded successfully, `Ok(false)` if the template already exists, or an error if the download failed.
     pub fn fetch(url: &str, templates_dir: &PathBuf, force: bool) -> Result<bool> {
+        let url_list = URLDispatcher::process(url)?;
+        for url in url_list {
+            if let Ok((result, template_name)) = Self::fetch_single(&url, templates_dir, force) {
+                if result {
+                    println!(
+                        "{}",
+                        Green.paint(format!(
+                            "Template '{}' installed successfully",
+                            template_name
+                        ))
+                    );
+                }
+            } else {
+                return Err(Error::TemplateDownloadError(
+                    url.to_string(),
+                    "Failed to download template".to_string(),
+                ));
+            }
+        }
+        Ok(true)
+    }
+
+    /// Fetches a template from a remote repository.
+    ///
+    /// # Arguments
+    /// * `remote` - The remote repository to fetch the template from.
+    /// * `template_name` - The name of the template to fetch.
+    /// * `input_dir` - The directory to save the template to.
+    ///
+    /// # Returns
+    /// * `Result<bool>`
+    /// - `Ok(true)` if the template was downloaded successfully,
+    /// - `Ok(false)` if the template already exists, or an error if the download failed.
+    pub fn fetch_from_remote<S: AsRef<str>>(
+        remote: S,
+        template_name: &str,
+        input_dir: &PathBuf,
+    ) -> Result<bool> {
+        let url_list = URLDispatcher::process(remote.as_ref())?;
+
+        // Try to find a URL that matches the template name
+        let matching_url = url_list.iter().find(|url| {
+            url.ends_with(template_name) || url.ends_with(&format!("{}.tl", template_name))
+        });
+
+        match matching_url {
+            Some(url) => {
+                // Found a matching URL, proceed with fetch_single
+                let (result, _) = Self::fetch_single(url, input_dir, true)?;
+                Ok(result)
+            }
+            None => {
+                // No matching URL found
+                Err(Error::TemplateDownloadError(
+                    template_name.to_string(),
+                    "No matching template found in remote repository".to_string(),
+                ))
+            }
+        }
+    }
+
+    /// Retrieves the template from the given URL and stores it
+    /// under the given templates directory.
+    ///
+    /// # Arguments
+    /// * `url` - The URL of the template to download.
+    /// * `templates_dir` - The directory where the template will be stored.
+    /// * `force` - Whether to force the download even if the template already exists.
+    ///
+    /// # Returns
+    /// * `Result<bool>` - `Ok(true)` if the template was downloaded successfully, `Ok(false)` if the template already exists, or an error if the download failed.
+    pub fn fetch_single(url: &str, templates_dir: &PathBuf, force: bool) -> Result<(bool, String)> {
         let result =
             async { TemplateFetcher::download_file(&url, &templates_dir, force, true).await };
         match smol::block_on(result) {
             Ok(mut target_info) => {
                 if target_info.created {
                     Self::process_fetched_template(&mut target_info, force)?;
-                } else if !target_info.created && target_info.exists {
-                    println!(
-                        "{}",
-                        Yellow.paint(format!(
-                            "A template with the same name [{}] already exists",
-                            target_info.filename
-                        ))
-                    );
+                    Ok((true, target_info.filename))
+                } else {
+                    if target_info.exists {
+                        println!(
+                            "{}",
+                            Yellow.paint(format!(
+                                "A template with the same name [{}] already exists",
+                                target_info.filename
+                            ))
+                        );
+                    }
+                    restore_backup(&target_info.path)?;
+                    Ok((false, target_info.filename))
                 }
-                Ok(target_info.created)
             }
             Err(e) => Err(e),
         }
@@ -100,7 +181,7 @@ impl TemplateFetcher {
             target_info.created = false;
             return Ok(target_info);
         } else if target_info.exists {
-            Self::create_backup(&target_info.path)?;
+            create_backup(&target_info.path)?;
         }
 
         let mut response = Request::get(target_info.url.as_deref().unwrap_or(url))
@@ -143,12 +224,16 @@ impl TemplateFetcher {
             Self::download_without_progress(&mut body, &mut file).await?;
         }
 
+        if target_info.exists {
+            remove_backup(&target_info.path)?;
+        }
+
         target_info.created = true;
         Ok(target_info)
     }
 
     /// Handles a newly created template, ensuring it has the correct extension
-    /// and displaying appropriate messages.
+    /// and renaming it if necessary.
     ///
     /// # Arguments
     /// * `target_info` - Information about the downloaded template
@@ -159,7 +244,7 @@ impl TemplateFetcher {
     fn process_fetched_template(target_info: &mut TargetInfo, force: bool) -> Result<bool> {
         match TemplateReader::get_template_name(&target_info.path) {
             Ok(mut template_name) => {
-                template_name = template_name.to_lowercase();
+                template_name = template_name.to_lowercase().replace(" ", "_");
                 if !template_name.ends_with(DEFAULT_TEMPLATE_EXT) {
                     template_name = format!("{}{}", template_name, DEFAULT_TEMPLATE_EXT);
                 }
@@ -294,27 +379,8 @@ impl TemplateFetcher {
     /// Returns a Result indicating success or failure.
     fn ensure_directory_exists(path: &PathBuf) -> Result<()> {
         if !path.exists() {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
+            std::fs::create_dir_all(path)?;
         }
-        Ok(())
-    }
-
-    /// Creates a backup of an existing file before downloading a new version.
-    /// The backup will have the same name as the original file but with a .bak extension.
-    ///
-    /// # Arguments
-    /// * `path` - The path of the file to backup.
-    ///
-    /// # Returns
-    /// Returns a Result indicating success or failure.
-    fn create_backup(path: &PathBuf) -> Result<()> {
-        let backup_path = path.with_extension(format!(
-            "{}.bak",
-            path.extension().and_then(|ext| ext.to_str()).unwrap_or("")
-        ));
-        std::fs::rename(path, &backup_path)?;
         Ok(())
     }
 
@@ -385,7 +451,7 @@ impl TemplateFetcher {
         ));
 
         // Show the green completion message and bar for 800ms
-        smol::Timer::after(Duration::from_millis(800)).await;
+        smol::Timer::after(Duration::from_millis(100)).await;
         pb.finish_and_clear();
 
         // Show cursor again after clearing the progress bar

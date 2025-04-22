@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    config::{MainConfig, DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME},
+    config::{MainConfig, DEFAULT_REMOTE_REPO, DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME},
     context::Context,
     debug, display,
     error::*,
@@ -22,9 +22,6 @@ use crate::fetcher::TemplateFetcher;
 #[cfg(feature = "fetcher")]
 use crate::fallback_map::MapProvider;
 
-#[cfg(feature = "fetcher")]
-use ctrlc::set_handler;
-
 #[cfg(feature = "display")]
 use crate::theme::ThemeManager;
 
@@ -40,13 +37,6 @@ pub struct TemplatesController<'a> {
 /// and formatting/rendering.
 impl<'a> TemplatesController<'a> {
     pub fn new(input_dir: PathBuf, config: &'a MainConfig) -> Self {
-        // Set up Ctrl+C handler to restore cursor
-        #[cfg(feature = "fetcher")]
-        {
-            if let Err(e) = set_handler(utils::cleanup) {
-                eprintln!("Warning: Failed to set Ctrl+C handler: {}", e);
-            }
-        }
         Self { input_dir, config }
     }
 
@@ -96,11 +86,6 @@ impl<'a> TemplatesController<'a> {
                     .ok_or_else(|| Error::CommandError("Missing URL".to_string()))
                     .and_then(|url| {
                         TemplateFetcher::fetch(url, &self.input_dir, context.is_active("force"))
-                    })
-                    .inspect(|result| {
-                        if *result {
-                            println!("{}", Green.paint("Template installed successfully"));
-                        }
                     }),
                 _ => Err(Error::ArgsProcessingError(
                     "Invalid subcommand provided".to_string(),
@@ -157,12 +142,13 @@ impl<'a> TemplatesController<'a> {
     /// # Examples
     /// ```
     /// use std::path::PathBuf;
-    /// use titular::{controller::TemplatesController, config::MainConfig};
+    /// use titular::{controller::TemplatesController, config::MainConfig, context::Context};
     ///
     /// let config = MainConfig::default();
     /// let input_dir = PathBuf::from("templates");
     /// let controller = TemplatesController::new(input_dir, &config);
-    /// let result = controller.list();
+    /// let context = Context::new();
+    /// let result = controller.list(&context);
     /// assert!(result.is_ok());
     /// ```
     pub fn list_templates(&self) -> Result<bool> {
@@ -291,9 +277,9 @@ impl<'a> TemplatesController<'a> {
 
         if template.exists() {
             // Create a fallback map with the context and the config
-            let mut context: FallbackMap<String, String> = FallbackMap::from(context);
-            context.add(self.config);
-            return match display::display_template(&template, &context) {
+            let mut context_map: FallbackMap<String, String> = FallbackMap::from(context);
+            context_map.add(self.config);
+            return match display::display_template(&template, &context_map) {
                 Ok(_) => Ok(true),
                 Err(e) => Err(Error::TemplateReadError {
                     file: path,
@@ -357,8 +343,8 @@ impl<'a> TemplatesController<'a> {
     }
 
     /// Performs the rendering of the template using the template formatter.
-    /// In case the "fetched" feature is enabled, the template is downloaded
-    /// automatically in case it's not present (and is available in the remote repository).
+    /// In case it's not present (and is not the default template), it will be downloaded
+    /// automatically from the remote repository (if the "fetcher" feature is enabled).
     ///
     /// # Arguments
     /// * `context` - The context to be used for rendering the template.
@@ -370,7 +356,15 @@ impl<'a> TemplatesController<'a> {
         self.preprocess_template(template_name)?;
 
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
-        TemplateFormatter::format(&template_payload, context)
+        // Create a fallback map with the template vars, context and the config
+        let mut full_context: FallbackMap<String, String> = FallbackMap::from(&template_payload);
+        full_context.add(context);
+        full_context.add(self.config);
+
+        let formatter = TemplateFormatter::new(full_context);
+        let formatted = formatter.format(&template_payload)?;
+        writeln!(std::io::stdout(), "{}", formatted)?;
+        Ok(true)
     }
 
     /// Performs the preprocessing of the template.
@@ -390,6 +384,19 @@ impl<'a> TemplatesController<'a> {
         if !template.exists() && template_name == DEFAULT_TEMPLATE_NAME {
             debug!("Recovering template");
             TemplateWriter::write_new(&template, self.config)?;
+        }
+        #[cfg(feature = "fetcher")]
+        if !template.exists() {
+            // Try to fetch the template from the remote repository
+            TemplateFetcher::fetch_from_remote(
+                self.config
+                    .templates
+                    .remote_repo
+                    .as_deref()
+                    .unwrap_or(DEFAULT_REMOTE_REPO),
+                template_name,
+                &self.input_dir,
+            )?;
         }
         Ok(())
     }

@@ -1,4 +1,6 @@
+use crate::error::*;
 use nu_ansi_term::Color::{Blue, Yellow};
+use std::path::PathBuf;
 use std::process::Command;
 
 pub const ROOT_PREFIX: &str = "\u{f115}";
@@ -43,9 +45,11 @@ pub fn format_bytes(bytes: u64) -> String {
 ///
 /// Currently the following operations are performed:
 /// - Restores the cursor visibility in case of interruption
+/// - Terminates the program with a proper exit code
 #[cfg(feature = "fetcher")]
 pub fn cleanup() {
     let _ = crossterm::execute!(std::io::stdout(), crossterm::cursor::Show);
+    std::process::exit(1);
 }
 
 /// Checks if a command exists and is executable.
@@ -168,8 +172,67 @@ pub fn print_tree_with_prefixes<T: AsRef<str>, F, G>(
     }
 }
 
+/// Creates a backup of an existing file before downloading a new version.
+/// The backup will have the same name as the original file but with a .bak extension.
+///
+/// # Arguments
+/// * `path` - The path of the file to backup.
+///
+/// # Returns
+/// Returns a Result indicating success or failure.
+pub fn create_backup(path: &PathBuf) -> Result<()> {
+    let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+        path.with_extension(format!("{}.bak", ext))
+    } else {
+        path.with_extension("bak")
+    };
+    std::fs::rename(path, &backup_path)?;
+    Ok(())
+}
+
+/// Restores a backup file by renaming it back to its original name.
+///
+/// # Arguments
+/// * `path` - The path of the file to restore from backup.
+///
+/// # Returns
+/// Returns a Result indicating success or failure.
+pub fn restore_backup(path: &PathBuf) -> Result<()> {
+    let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+        path.with_extension(format!("{}.bak", ext))
+    } else {
+        path.with_extension("bak")
+    };
+    if backup_path.exists() {
+        std::fs::rename(&backup_path, path)?;
+    }
+    Ok(())
+}
+
+/// Removes a backup file if present.
+///
+/// # Arguments
+/// * `path` - The path of the backup file to remove.
+///
+/// # Returns
+/// Returns a Result indicating success or failure.
+pub fn remove_backup(path: &PathBuf) -> Result<()> {
+    let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+        path.with_extension(format!("{}.bak", ext))
+    } else {
+        path.with_extension("bak")
+    };
+    if backup_path.exists() {
+        std::fs::remove_file(&backup_path)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
     use super::*;
 
     #[test]
@@ -225,5 +288,129 @@ mod tests {
         // Test edge cases
         // Instead of testing u64::MAX directly, test a large but manageable number
         assert_eq!(format_bytes(1024 * 1024 * 1024 * 1024 * 16), "16384.0 GB");
+    }
+
+    #[test]
+    fn test_backup_operations() -> Result<()> {
+        // Create a temporary file with some content
+        let mut temp_file = NamedTempFile::new()?;
+        let original_path = temp_file.path().to_path_buf();
+        writeln!(temp_file, "Original content")?;
+        temp_file.flush()?;
+
+        // Create a new path with a known extension
+        let new_path = original_path.with_extension("txt");
+        std::fs::rename(&original_path, &new_path)?;
+
+        // Test create_backup
+        create_backup(&new_path)?;
+        let backup_path = new_path.with_extension("txt.bak");
+        assert!(
+            backup_path.exists(),
+            "Backup file should exist after create_backup"
+        );
+        assert!(
+            !new_path.exists(),
+            "Original file should not exist after create_backup"
+        );
+
+        // Test restore_backup
+        restore_backup(&new_path)?;
+        assert!(
+            new_path.exists(),
+            "Original file should exist after restore_backup"
+        );
+        assert!(
+            !backup_path.exists(),
+            "Backup file should not exist after restore_backup"
+        );
+
+        // Test remove_backup
+        create_backup(&new_path)?;
+        assert!(
+            backup_path.exists(),
+            "Backup file should exist before remove_backup"
+        );
+        remove_backup(&new_path)?;
+        assert!(
+            !backup_path.exists(),
+            "Backup file should not exist after remove_backup"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_backup_operations_with_extension() -> Result<()> {
+        // Create a temporary file with an extension
+        let mut temp_file = NamedTempFile::new()?;
+        let original_path = temp_file.path().to_path_buf();
+        let new_path = original_path.with_extension("txt");
+        std::fs::rename(&original_path, &new_path)?;
+        writeln!(temp_file, "Original content")?;
+        temp_file.flush()?;
+
+        // Test create_backup with extension
+        create_backup(&new_path)?;
+        let backup_path = new_path.with_extension("txt.bak");
+        assert!(
+            backup_path.exists(),
+            "Backup file should exist after create_backup"
+        );
+        assert!(
+            !new_path.exists(),
+            "Original file should not exist after create_backup"
+        );
+
+        // Test restore_backup with extension
+        restore_backup(&new_path)?;
+        assert!(
+            new_path.exists(),
+            "Original file should exist after restore_backup"
+        );
+        assert!(
+            !backup_path.exists(),
+            "Backup file should not exist after restore_backup"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_backup_operations_without_extension() -> Result<()> {
+        // Create a temporary file without an extension
+        let mut temp_file = NamedTempFile::new()?;
+        let original_path = temp_file.path().to_path_buf();
+        writeln!(temp_file, "Original content")?;
+        temp_file.flush()?;
+
+        // Rename the file to remove the extension
+        let new_path = original_path.with_extension("");
+        std::fs::rename(&original_path, &new_path)?;
+
+        // Test create_backup without extension
+        create_backup(&new_path)?;
+        let backup_path = new_path.with_extension("bak");
+        assert!(
+            backup_path.exists(),
+            "Backup file should exist after create_backup"
+        );
+        assert!(
+            !new_path.exists(),
+            "Original file should not exist after create_backup"
+        );
+
+        // Test restore_backup without extension
+        restore_backup(&new_path)?;
+        assert!(
+            new_path.exists(),
+            "Original file should exist after restore_backup"
+        );
+        assert!(
+            !backup_path.exists(),
+            "Backup file should not exist after restore_backup"
+        );
+
+        Ok(())
     }
 }
