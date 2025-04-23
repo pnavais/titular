@@ -277,7 +277,7 @@ impl<'a> TemplatesController<'a> {
 
         if template.exists() {
             // Create a fallback map with the context and the config
-            let mut context_map: FallbackMap<String, String> = FallbackMap::from(context);
+            let mut context_map: FallbackMap<str, String> = FallbackMap::from(context);
             context_map.add(self.config);
             return match display::display_template(&template, &context_map) {
                 Ok(_) => Ok(true),
@@ -357,7 +357,7 @@ impl<'a> TemplatesController<'a> {
 
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
         // Create a fallback map with the template vars, context and the config
-        let mut full_context: FallbackMap<String, String> = FallbackMap::from(&template_payload);
+        let mut full_context: FallbackMap<str, String> = FallbackMap::from(&template_payload);
         full_context.add(context);
         full_context.add(self.config);
 

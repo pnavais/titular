@@ -61,12 +61,12 @@ fn setup_pager() {
 ///
 /// # Returns
 /// A `Result` indicating success or failure.
-fn check_pager(context: &FallbackMap<String, String>, path: &Path) -> Result<()> {
+fn check_pager(context: &FallbackMap<str, String>, path: &Path) -> Result<()> {
     let display = Display::from_str(
         context
-            .get_str_ref("mode")
-            .or_else(|| context.get_str_ref("defaults.display"))
-            .unwrap_or("raw"),
+            .get("mode")
+            .or_else(|| context.get("defaults.display"))
+            .unwrap_or(&"raw".to_string()),
     )?;
 
     match display {
@@ -104,7 +104,7 @@ fn check_pager(context: &FallbackMap<String, String>, path: &Path) -> Result<()>
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(feature = "display")]
-fn display_fancy(content: &str, context: &FallbackMap<String, String>) -> Result<()> {
+fn display_fancy(content: &str, context: &FallbackMap<str, String>) -> Result<()> {
     // Load the serialized syntax set from the build script
     let syntax_set_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/syntax_set.bin"));
     let syntax_set: SyntaxSet =
@@ -120,8 +120,9 @@ fn display_fancy(content: &str, context: &FallbackMap<String, String>) -> Result
     // 2. Fallback to defaults.display_theme
     // 3. Finally use DEFAULT_THEME
     let theme_name = context
-        .get_str_ref("theme")
-        .or_else(|| context.get_str_ref("defaults.display_theme"))
+        .get("theme")
+        .or_else(|| context.get("defaults.display_theme"))
+        .map(|s| s as &str)
         .unwrap_or(DEFAULT_THEME);
 
     let theme = theme_manager
@@ -157,14 +158,14 @@ fn display_fancy(content: &str, context: &FallbackMap<String, String>) -> Result
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(feature = "display")]
-pub fn display_template(path: &Path, context: &FallbackMap<String, String>) -> Result<()> {
+pub fn display_template(path: &Path, context: &FallbackMap<str, String>) -> Result<()> {
     // Load the template content
     let content = fs::read_to_string(path)?;
     let display = Display::from_str(
         context
-            .get_str_ref("mode")
-            .or_else(|| context.get_str_ref("defaults.display"))
-            .unwrap_or("raw"),
+            .get("mode")
+            .or_else(|| context.get("defaults.display"))
+            .unwrap_or(&"raw".to_string()),
     )?;
 
     // Setup pager if needed
@@ -191,7 +192,7 @@ pub fn display_template(path: &Path, context: &FallbackMap<String, String>) -> R
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(not(feature = "display"))]
-pub fn display_template(path: &Path, context: &FallbackMap<String, String>) -> Result<()> {
+pub fn display_template(path: &Path, context: &FallbackMap<str, String>) -> Result<()> {
     let content = fs::read_to_string(path)?;
 
     check_pager(context, path)?;

@@ -141,16 +141,16 @@ impl MainConfig {
     }
 }
 
-impl MapProvider<String, String> for MainConfig {
-    fn contains(&self, key: &String) -> bool {
+impl MapProvider<str, String> for MainConfig {
+    fn contains(&self, key: &str) -> bool {
         self.vars.contains_key(key)
     }
 
-    fn resolve(&self, key: &String) -> Option<&String> {
+    fn resolve(&self, key: &str) -> Option<&String> {
         self.vars.get(key)
     }
 
-    fn is_active(&self, key: &String) -> bool {
+    fn is_active(&self, key: &str) -> bool {
         match self.resolve(key) {
             Some(v) => v == "true",
             None => false,
@@ -171,16 +171,16 @@ impl MapProvider<String, String> for MainConfig {
     }
 }
 
-impl MapProvider<String, String> for TemplateConfig {
-    fn contains(&self, key: &String) -> bool {
+impl MapProvider<str, String> for TemplateConfig {
+    fn contains(&self, key: &str) -> bool {
         self.vars.contains_key(key)
     }
 
-    fn resolve(&self, key: &String) -> Option<&String> {
+    fn resolve(&self, key: &str) -> Option<&String> {
         self.vars.get(key)
     }
 
-    fn is_active(&self, key: &String) -> bool {
+    fn is_active(&self, key: &str) -> bool {
         match self.resolve(key) {
             Some(v) => v == "true",
             None => false,

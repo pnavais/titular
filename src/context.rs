@@ -116,19 +116,16 @@ impl Context {
     }
 }
 
-impl<K: ?Sized> MapProvider<K, String> for Context
-where
-    K: AsRef<str>,
-{
-    fn contains(&self, key: &K) -> bool {
-        self.context.contains_key(key.as_ref())
+impl MapProvider<str, String> for Context {
+    fn contains(&self, key: &str) -> bool {
+        self.context.contains_key(key)
     }
 
-    fn resolve(&self, key: &K) -> Option<&String> {
+    fn resolve(&self, key: &str) -> Option<&String> {
         self.get(key)
     }
 
-    fn is_active(&self, key: &K) -> bool {
+    fn is_active(&self, key: &str) -> bool {
         match self.get(key) {
             Some(v) => v == "true",
             None => false,

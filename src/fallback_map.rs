@@ -14,16 +14,16 @@
 //!     vars: HashMap<String, String>,
 //! }
 //!
-//! impl MapProvider<String, String> for MyProvider {
-//!     fn contains(&self, key: &String) -> bool {
+//! impl MapProvider<str, String> for MyProvider {
+//!     fn contains(&self, key: &str) -> bool {
 //!         self.vars.contains_key(key)
 //!     }
 //!
-//!     fn resolve(&self, key: &String) -> Option<&String> {
+//!     fn resolve(&self, key: &str) -> Option<&String> {
 //!         self.vars.get(key)
 //!     }
 //!
-//!     fn is_active(&self, _key: &String) -> bool {
+//!     fn is_active(&self, _key: &str) -> bool {
 //!         true
 //!     }
 //! }
@@ -37,9 +37,9 @@
 //! let mut map = FallbackMap::from(&provider1);
 //! map.add(&provider2);
 //!
-//! assert_eq!(map.get_str("key1"), Some(&"value1".to_string()));
-//! assert_eq!(map.get_str("key2"), Some(&"value2".to_string()));
-//! assert_eq!(map.get_str("key3"), None);
+//! assert_eq!(map.get("key1"), Some(&"value1".to_string()));
+//! assert_eq!(map.get("key2"), Some(&"value2".to_string()));
+//! assert_eq!(map.get("key3"), None);
 //! ```
 //!
 //! # Thread Safety
@@ -52,12 +52,6 @@
 //! - The lookup is performed in order of providers, so the most frequently accessed
 //!   values should be in the first provider.
 //! - The implementation uses references to avoid cloning data, making it memory efficient.
-//! - For string keys, the base `get` method uses references, but the convenience methods
-//!   (`get_str`, `contains_str`, etc.) convert the input to an owned String for internal
-//!   lookup. This is because the underlying `MapProvider` trait is implemented for `String`
-//!   keys, not `str` keys. If performance is critical, consider using the base `get` method
-//!   with owned `String` keys directly.
-
 use std::fmt::Debug;
 
 /// A trait for providers that can supply key-value pairs.
@@ -80,16 +74,16 @@ use std::fmt::Debug;
 ///     vars: HashMap<String, String>,
 /// }
 ///
-/// impl MapProvider<String, String> for ConfigProvider {
-///     fn contains(&self, key: &String) -> bool {
+/// impl MapProvider<str, String> for ConfigProvider {
+///     fn contains(&self, key: &str) -> bool {
 ///         self.vars.contains_key(key)
 ///     }
 ///
-///     fn resolve(&self, key: &String) -> Option<&String> {
+///     fn resolve(&self, key: &str) -> Option<&String> {
 ///         self.vars.get(key)
 ///     }
 ///
-///     fn is_active(&self, _key: &String) -> bool {
+///     fn is_active(&self, _key: &str) -> bool {
 ///         true
 ///     }
 /// }
@@ -166,16 +160,16 @@ pub trait MapProvider<K: ?Sized, V>: Sync {
 ///     vars: HashMap<String, String>,
 /// }
 ///
-/// impl MapProvider<String, String> for MyProvider {
-///     fn contains(&self, key: &String) -> bool {
+/// impl MapProvider<str, String> for MyProvider {
+///     fn contains(&self, key: &str) -> bool {
 ///         self.vars.contains_key(key)
 ///     }
 ///
-///     fn resolve(&self, key: &String) -> Option<&String> {
+///     fn resolve(&self, key: &str) -> Option<&String> {
 ///         self.vars.get(key)
 ///     }
 ///
-///     fn is_active(&self, _key: &String) -> bool {
+///     fn is_active(&self, _key: &str) -> bool {
 ///         true
 ///     }
 /// }
@@ -189,8 +183,8 @@ pub trait MapProvider<K: ?Sized, V>: Sync {
 /// let mut map = FallbackMap::from(&provider1);
 /// map.add(&provider2);
 ///
-/// assert_eq!(map.get_str("key1"), Some(&"value1".to_string()));
-/// assert_eq!(map.get_str("key2"), Some(&"value2".to_string()));
+/// assert_eq!(map.get("key1"), Some(&"value1".to_string()));
+/// assert_eq!(map.get("key2"), Some(&"value2".to_string()));
 /// ```
 pub struct FallbackMap<'a, K, V>
 where
@@ -328,80 +322,6 @@ where
             }
         }
         result
-    }
-}
-
-/// Implementations for string-like keys
-impl<'a, V> FallbackMap<'a, String, V> {
-    /// Get a value using a string-like key (String or &str)
-    ///
-    /// # Arguments
-    /// * `key` - The key to look up
-    ///
-    /// # Returns
-    /// `Some(value)` if the key is found, `None` otherwise.
-    pub fn get_str<K: AsRef<str>>(&self, key: K) -> Option<&V> {
-        let key_str = key.as_ref().to_string();
-        self.get(&key_str)
-    }
-
-    /// Check if a key exists using a string-like key (String or &str)
-    ///
-    /// # Arguments
-    /// * `key` - The key to check
-    ///
-    /// # Returns
-    /// `true` if the key exists, `false` otherwise.
-    pub fn contains_str<K: AsRef<str>>(&self, key: K) -> bool {
-        let key_str = key.as_ref().to_string();
-        self.contains(&key_str)
-    }
-
-    /// Check if a key is active using a string-like key (String or &str)
-    ///
-    /// # Arguments
-    /// * `key` - The key to check
-    ///
-    /// # Returns
-    /// `true` if the key is active, `false` otherwise.
-    pub fn is_active_str<K: AsRef<str>>(&self, key: K) -> bool {
-        let key_str = key.as_ref().to_string();
-        self.is_active(&key_str)
-    }
-
-    /// Gets a value by key, returning a string slice.
-    ///
-    /// This is more efficient than get_str when you need a &str.
-    ///
-    /// # Arguments
-    /// * `key` - The key to look up
-    ///
-    /// # Returns
-    /// `Some(value)` if the key is found, `None` otherwise.
-    pub fn get_str_ref<K: AsRef<str>>(&self, key: K) -> Option<&str>
-    where
-        V: AsRef<str>,
-    {
-        let key_str = key.as_ref().to_string();
-        self.get(&key_str).map(|s| s.as_ref())
-    }
-
-    /// Gets a value by key, returning a string slice or a default value.
-    ///
-    /// This is more efficient than get_str when you need a &str.
-    ///
-    /// # Arguments
-    /// * `key` - The key to look up
-    /// * `default` - The default value to return if the key is not found
-    ///
-    /// # Returns
-    /// The value if found, or the default value.
-    pub fn get_str_ref_or<'b, K: AsRef<str>>(&'b self, key: K, default: &'b str) -> &'b str
-    where
-        V: AsRef<str>,
-    {
-        let key_str = key.as_ref().to_string();
-        self.get(&key_str).map(|s| s.as_ref()).unwrap_or(default)
     }
 }
 

@@ -19,11 +19,11 @@ pub struct VarFormat {
 }
 
 pub struct TemplateFormatter<'a> {
-    context: FallbackMap<'a, String, String>,
+    context: FallbackMap<'a, str, String>,
 }
 
 impl<'a> TemplateFormatter<'a> {
-    pub fn new(context: FallbackMap<'a, String, String>) -> Self {
+    pub fn new(context: FallbackMap<'a, str, String>) -> Self {
         Self { context }
     }
 
@@ -106,7 +106,7 @@ impl<'a> TemplateFormatter<'a> {
         // Get the base value from context
         let value = self
             .context
-            .get_str(var_name)
+            .get(var_name)
             .unwrap_or(&String::new())
             .to_string();
 
@@ -124,7 +124,7 @@ impl<'a> TemplateFormatter<'a> {
                         let color_name = &fg[3..fg.len() - 1];
                         // If color name starts with $, resolve from context, otherwise use as is
                         fg_color = if color_name.starts_with('$') {
-                            self.context.get_str(&color_name[1..]).map(String::from)
+                            self.context.get(&color_name[1..]).map(String::from)
                         } else {
                             Some(color_name.to_string())
                         };
@@ -133,7 +133,7 @@ impl<'a> TemplateFormatter<'a> {
                         let color_name = &bg[3..bg.len() - 1];
                         // If color name starts with $, resolve from context, otherwise use as is
                         bg_color = if color_name.starts_with('$') {
-                            self.context.get_str(&color_name[1..]).map(String::from)
+                            self.context.get(&color_name[1..]).map(String::from)
                         } else {
                             Some(color_name.to_string())
                         };
@@ -164,16 +164,16 @@ mod tests {
         vars: HashMap<String, String>,
     }
 
-    impl MapProvider<String, String> for TestContext {
-        fn contains(&self, key: &String) -> bool {
+    impl MapProvider<str, String> for TestContext {
+        fn contains(&self, key: &str) -> bool {
             self.vars.contains_key(key)
         }
 
-        fn resolve(&self, key: &String) -> Option<&String> {
+        fn resolve(&self, key: &str) -> Option<&String> {
             self.vars.get(key)
         }
 
-        fn is_active(&self, _key: &String) -> bool {
+        fn is_active(&self, _key: &str) -> bool {
             true
         }
     }
