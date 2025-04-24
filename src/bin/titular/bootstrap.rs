@@ -2,12 +2,15 @@ use chrono::prelude::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
-use titular::config::{DEFAULT_REMOTE_REPO, DEFAULT_TEMPLATE_NAME};
+use titular::config::DEFAULT_TEMPLATE_NAME;
 
 pub use titular::{
     config::{parse as config_parse, MainConfig},
     error::*,
 };
+
+#[cfg(feature = "fetcher")]
+use titular::config::DEFAULT_REMOTE_REPO;
 
 use crate::directories::PROJECT_DIRS;
 
@@ -130,7 +133,7 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
     std::fs::create_dir_all(parent_dir)?;
     let templates_dir = parent_dir.join("templates").to_string_lossy().into_owned();
     let current_date: DateTime<Local> = Local::now();
-    let mut config_data = DEFAULT_CONF
+    let config_data = DEFAULT_CONF
         .replacen("${templates_dir}", &templates_dir, 1)
         .replacen("${date}", &current_date.to_string(), 1)
         .replacen("${default_template_name}", DEFAULT_TEMPLATE_NAME, 1)
@@ -143,10 +146,16 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
             1,
         );
 
-    #[cfg(feature = "fetcher")]
-    {
-        config_data.push_str(&format!("remote_repo   = \"{}\"", DEFAULT_REMOTE_REPO));
-    }
+    let config_data = {
+        #[cfg(feature = "fetcher")]
+        {
+            let mut data = config_data;
+            data.push_str(&format!("remote_repo   = \"{}\"", DEFAULT_REMOTE_REPO));
+            data
+        }
+        #[cfg(not(feature = "fetcher"))]
+        config_data
+    };
 
     File::create(&config_file)?.write_all(config_data.as_bytes())?;
     Ok(config_data)

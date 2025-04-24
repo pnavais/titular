@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    config::{MainConfig, DEFAULT_REMOTE_REPO, DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME},
+    config::{MainConfig, DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME},
     context::Context,
     debug, display,
     error::*,
@@ -18,6 +18,9 @@ use crate::utils;
 
 #[cfg(feature = "fetcher")]
 use crate::fetcher::TemplateFetcher;
+
+#[cfg(feature = "fetcher")]
+use crate::config::DEFAULT_REMOTE_REPO;
 
 #[cfg(feature = "fetcher")]
 use crate::fallback_map::MapProvider;
@@ -56,7 +59,16 @@ impl<'a> TemplatesController<'a> {
     pub fn run_template_subcommand(&self, context: &Context) -> Result<bool> {
         match context.get("subcommand") {
             Some(cmd) => match cmd.as_str() {
-                "list" => self.list(context),
+                "list" => {
+                    #[cfg(feature = "display")]
+                    {
+                        self.list(context)
+                    }
+                    #[cfg(not(feature = "display"))]
+                    {
+                        self.list()
+                    }
+                }
                 "create" | "edit" | "remove" | "show" => {
                     let template_name = context
                         .get("template")
@@ -73,7 +85,7 @@ impl<'a> TemplatesController<'a> {
                     } else if cmd == "remove" {
                         self.remove(template_name)
                     } else if cmd == "show" {
-                        self.display(template_name, &context)
+                        self.display(template_name, context)
                     } else {
                         Err(Error::ArgsProcessingError(
                             "Invalid subcommand provided".to_string(),
@@ -102,21 +114,20 @@ impl<'a> TemplatesController<'a> {
     /// This function retrieves the list of templates or themes from the binary and prints them to the console.
     ///
     /// # Arguments
-    /// * `context` - The context containing the subcommand and template name. (only used when "display" feature is enabled)
+    /// * `context` - The context containing the subcommand and template name. Only used when "display" feature is enabled.
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
-    pub fn list(
-        &self,
-        #[cfg(feature = "display")] context: &Context,
-        #[cfg(not(feature = "display"))] _context: &Context,
-    ) -> Result<bool> {
-        #[cfg(feature = "display")]
-        {
-            if context.is_active("themes") {
-                return self.list_themes();
-            }
+    #[cfg(feature = "display")]
+    pub fn list(&self, context: &Context) -> Result<bool> {
+        if context.is_active("themes") {
+            return self.list_themes();
         }
+        self.list_templates()
+    }
+
+    #[cfg(not(feature = "display"))]
+    pub fn list(&self) -> Result<bool> {
         self.list_templates()
     }
 
