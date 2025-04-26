@@ -1,13 +1,13 @@
 use std::{
     fs::create_dir_all,
-    io::{Write, stdin, stdout},
+    io::{stdin, stdout, Write},
     path::{Path, PathBuf},
 };
 
 use nu_ansi_term::Color::Yellow;
 
 use crate::{
-    config::{DEFAULT_TEMPLATE_EXT, MainConfig},
+    config::{MainConfig, DEFAULT_TEMPLATE_EXT},
     error::*,
 };
 
@@ -21,7 +21,7 @@ pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 my_var = \"Hello\"\n\
                                 my_color = \"green\"\n\n\
                                 [pattern]\n\
-                                data = \"${f:fg[cl]:pad}${my_var:fg[my_color]+[ ]}${m:fg[my_color]}${f:fg[cr]:pad}\"\n";
+                                data = \"${f:fg[$cl]:pad}${my_var:fg[$my_color]+[ ]}${m:fg[$my_color]}${f:fg[$cr]:pad}\"\n";
 
 pub struct TemplateWriter {}
 

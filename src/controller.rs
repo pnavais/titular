@@ -159,7 +159,12 @@ impl<'a> TemplatesController<'a> {
     /// let input_dir = PathBuf::from("templates");
     /// let controller = TemplatesController::new(input_dir, &config);
     /// let context = Context::new();
+    ///
+    /// #[cfg(feature = "display")]
     /// let result = controller.list(&context);
+    /// #[cfg(not(feature = "display"))]
+    /// let result = controller.list();
+    ///
     /// assert!(result.is_ok());
     /// ```
     pub fn list_templates(&self) -> Result<bool> {
@@ -368,12 +373,11 @@ impl<'a> TemplatesController<'a> {
 
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
         // Create a fallback map with the template vars, context and the config
-        let mut full_context: FallbackMap<str, String> = FallbackMap::from(&template_payload);
-        full_context.add(context);
+        let mut full_context: FallbackMap<str, String> = FallbackMap::from(context);
+        full_context.add(&template_payload);
         full_context.add(self.config);
 
-        let formatter = TemplateFormatter::new(full_context);
-        let formatted = formatter.format(&template_payload)?;
+        let formatted = TemplateFormatter::new(full_context).format(&template_payload)?;
         writeln!(std::io::stdout(), "{}", formatted)?;
         Ok(true)
     }

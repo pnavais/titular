@@ -30,7 +30,7 @@ impl ColorManager {
     ///
     /// A string with the color applied
     pub fn format<'a>(
-        colours: &FallbackMap<String, String>,
+        colours: &FallbackMap<str, String>,
         txt: &'a str,
         color_name: &str,
         is_bg: bool,
@@ -60,8 +60,8 @@ impl ColorManager {
     ///
     /// A color object
     ///
-    fn get_style(colours: &FallbackMap<String, String>, color_name: &str) -> Option<Color> {
-        match colours.get(&color_name.to_string()) {
+    fn get_style(colours: &FallbackMap<str, String>, color_name: &str) -> Option<Color> {
+        match colours.get(color_name) {
             Some(c) => {
                 if RGB_REGEX.is_match(c) {
                     let groups = RGB_REGEX.captures(c).unwrap();
