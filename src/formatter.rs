@@ -143,32 +143,19 @@ impl<'a> TemplateFormatter<'a> {
     /// # Returns
     /// A formatted string
     pub fn format(&self, template_content: &TemplateConfig) -> Result<String> {
-        let groups = self.extract_groups(&template_content.pattern.data);
+        let pattern = &template_content.pattern.data;
 
-        println!("Groups: {:?}", groups);
+        // Use regex replace_all with a custom replacement function
+        let result = VAR_GROUP_REGEX.replace_all(pattern, |caps: &regex::Captures| {
+            if let Some(m) = caps.get(1) {
+                let format = self.parse_var_expression(m.as_str());
+                format.format(&self.context)
+            } else {
+                caps[0].to_string()
+            }
+        });
 
-        Ok(groups
-            .into_iter()
-            .map(|group| group.format(&self.context))
-            .collect::<Vec<String>>()
-            .join(""))
-    }
-
-    /// Extracts and parses all groups from a template string.
-    /// A group is defined as content between ${ and }.
-    /// The content can include variable name, style, and color information.
-    ///
-    /// # Arguments
-    /// * `input` - The input string to process
-    ///
-    /// # Returns
-    /// A vector of VarFormatter implementations containing the parsed information
-    fn extract_groups(&self, input: &str) -> Vec<Box<dyn VarFormatter>> {
-        VAR_GROUP_REGEX
-            .captures_iter(input)
-            .filter_map(|cap| cap.get(1).map(|m| self.parse_var_expression(m.as_str())))
-            .map(|format| Box::new(format) as Box<dyn VarFormatter>)
-            .collect()
+        Ok(result.to_string())
     }
 
     /// Parses a single variable expression into a VarFormat struct.
