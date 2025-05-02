@@ -25,6 +25,7 @@
 //! //    .unwrap();
 //! ```
 
+pub mod color_filter;
 pub mod color_manager;
 pub mod config;
 pub mod context;
@@ -33,7 +34,6 @@ pub mod controller;
 pub mod dispatcher;
 pub mod display;
 pub mod error;
-pub mod fallback_map;
 #[cfg(feature = "fetcher")]
 pub mod fetcher;
 pub mod formatter;
@@ -41,6 +41,7 @@ pub mod formatter;
 pub mod github;
 pub mod log;
 pub mod reader;
+pub mod style_filter;
 #[cfg(feature = "minimal")]
 pub mod term;
 #[cfg(feature = "display")]

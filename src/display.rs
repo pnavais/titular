@@ -8,8 +8,8 @@ use std::io::IsTerminal;
 use std::str::FromStr;
 
 use crate::config::Display;
+use crate::context::Context;
 use crate::error::*;
-use crate::fallback_map::FallbackMap;
 
 use pager::Pager;
 
@@ -61,7 +61,7 @@ fn setup_pager() {
 ///
 /// # Returns
 /// A `Result` indicating success or failure.
-fn check_pager(context: &FallbackMap<str, String>, path: &Path) -> Result<()> {
+fn check_pager(context: &Context, path: &Path) -> Result<()> {
     let display = Display::from_str(
         context
             .get("mode")
@@ -104,7 +104,7 @@ fn check_pager(context: &FallbackMap<str, String>, path: &Path) -> Result<()> {
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(feature = "display")]
-fn display_fancy(content: &str, context: &FallbackMap<str, String>) -> Result<()> {
+fn display_fancy(content: &str, context: &Context) -> Result<()> {
     // Load the serialized syntax set from the build script
     let syntax_set_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/syntax_set.bin"));
     let syntax_set: SyntaxSet =
@@ -158,7 +158,7 @@ fn display_fancy(content: &str, context: &FallbackMap<str, String>) -> Result<()
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(feature = "display")]
-pub fn display_template(path: &Path, context: &FallbackMap<str, String>) -> Result<()> {
+pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     // Load the template content
     let content = fs::read_to_string(path)?;
     let display = Display::from_str(
@@ -192,7 +192,7 @@ pub fn display_template(path: &Path, context: &FallbackMap<str, String>) -> Resu
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(not(feature = "display"))]
-pub fn display_template(path: &Path, context: &FallbackMap<str, String>) -> Result<()> {
+pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     let content = fs::read_to_string(path)?;
 
     check_pager(context, path)?;

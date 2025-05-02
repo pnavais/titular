@@ -45,7 +45,7 @@ impl App {
                 self.matches
                     .get_many::<String>("message")
                     .unwrap()
-                    .map(|s| s.to_string())
+                    .map(|s| s.as_str())
                     .collect(),
             );
         }
@@ -55,7 +55,7 @@ impl App {
                 self.matches
                     .get_many::<String>("filler")
                     .unwrap()
-                    .map(|s| s.to_string())
+                    .map(|s| s.as_str())
                     .collect(),
             );
         }
@@ -64,7 +64,7 @@ impl App {
                 .matches
                 .get_many::<String>("set")
                 .unwrap()
-                .map(|s| s.to_string())
+                .map(|s| s.as_str())
             {
                 let k: Vec<&str> = v.split('=').collect();
                 if k.len() > 1 {
@@ -137,7 +137,7 @@ impl App {
 
                 // Handle multiple values
                 if let Ok(Some(values)) = args.try_get_many::<String>(arg_name) {
-                    let values_vec: Vec<String> = values.map(|v| v.to_string()).collect();
+                    let values_vec: Vec<&str> = values.map(|v| v.as_str()).collect();
 
                     if !values_vec.is_empty() {
                         // If there are multiple values, add them as a multi-value entry

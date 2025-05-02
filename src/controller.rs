@@ -8,7 +8,6 @@ use crate::{
     context::Context,
     debug, display,
     error::*,
-    fallback_map::FallbackMap,
     formatter::TemplateFormatter,
     reader::TemplateReader,
     writer::TemplateWriter,
@@ -21,9 +20,6 @@ use crate::fetcher::TemplateFetcher;
 
 #[cfg(feature = "fetcher")]
 use crate::config::DEFAULT_REMOTE_REPO;
-
-#[cfg(feature = "fetcher")]
-use crate::fallback_map::MapProvider;
 
 #[cfg(feature = "display")]
 use crate::theme::ThemeManager;
@@ -58,7 +54,7 @@ impl<'a> TemplatesController<'a> {
     /// A `Result` indicating success or failure.
     pub fn run_template_subcommand(&self, context: &Context) -> Result<bool> {
         match context.get("subcommand") {
-            Some(cmd) => match cmd.as_str() {
+            Some(cmd) => match cmd {
                 "list" => {
                     #[cfg(feature = "display")]
                     {
@@ -118,6 +114,22 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
+    /// # Examples
+    /// ```
+    /// use std::path::PathBuf;
+    /// use titular::{controller::TemplatesController, config::MainConfig, context::Context};
+    ///
+    /// let config = MainConfig::default();
+    /// let input_dir = PathBuf::from("templates");
+    /// let controller = TemplatesController::new(input_dir, &config);
+    /// let context = Context::new();
+    ///
+    /// #[cfg(feature = "display")]
+    /// let result = controller.list(&context);
+    /// #[cfg(not(feature = "display"))]
+    /// let result = controller.list();
+    ///
+    /// assert!(result.is_ok());
     #[cfg(feature = "display")]
     pub fn list(&self, context: &Context) -> Result<bool> {
         if context.is_active("themes") {
@@ -150,22 +162,7 @@ impl<'a> TemplatesController<'a> {
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
     ///
-    /// # Examples
-    /// ```
-    /// use std::path::PathBuf;
-    /// use titular::{controller::TemplatesController, config::MainConfig, context::Context};
-    ///
-    /// let config = MainConfig::default();
-    /// let input_dir = PathBuf::from("templates");
-    /// let controller = TemplatesController::new(input_dir, &config);
-    /// let context = Context::new();
-    ///
-    /// #[cfg(feature = "display")]
-    /// let result = controller.list(&context);
-    /// #[cfg(not(feature = "display"))]
-    /// let result = controller.list();
-    ///
-    /// assert!(result.is_ok());
+
     /// ```
     pub fn list_templates(&self) -> Result<bool> {
         if self.input_dir.exists() {
@@ -292,9 +289,9 @@ impl<'a> TemplatesController<'a> {
         let template = self.input_dir.clone().join(&path);
 
         if template.exists() {
-            // Create a fallback map with the context and the config
-            let mut context_map: FallbackMap<str, String> = FallbackMap::from(context);
-            context_map.add(self.config);
+            // Create a fallback map with the config and the context
+            let mut context_map = Context::from(&self.config.vars);
+            context_map.extend_from(context);
             return match display::display_template(&template, &context_map) {
                 Ok(_) => Ok(true),
                 Err(e) => Err(Error::TemplateReadError {
@@ -372,10 +369,11 @@ impl<'a> TemplatesController<'a> {
         self.preprocess_template(template_name)?;
 
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
-        // Create a fallback map with the template vars, context and the config
-        let mut full_context: FallbackMap<str, String> = FallbackMap::from(context);
-        full_context.add(&template_payload);
-        full_context.add(self.config);
+        // Create a fallback map with the template vars, config and context
+        let mut full_context = Context::new();
+        full_context.extend(&template_payload.vars);
+        full_context.extend(&self.config.vars);
+        full_context.extend_from(context);
 
         let formatted = TemplateFormatter::new(full_context).format(&template_payload)?;
         writeln!(std::io::stdout(), "{}", formatted)?;

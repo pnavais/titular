@@ -1,7 +1,22 @@
-use crate::fallback_map::FallbackMap;
 use nu_ansi_term::{Color, Color::*, Style};
 use once_cell::sync::Lazy;
 use regex::Regex;
+
+use crate::context::Context;
+
+#[derive(Debug, Clone, Copy)]
+pub enum StyleScope {
+    FG,
+    BG,
+    BOTH,
+}
+
+#[derive(Debug)]
+pub struct StyleFormat {
+    pub fg_color: Option<String>,
+    pub bg_color: Option<String>,
+    pub scope: StyleScope,
+}
 
 static RGB_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new("(?i)^RGB\\([\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*\\)$")
@@ -23,26 +38,29 @@ impl ColorManager {
     ///
     /// * `colours` - A reference to the fallback map containing color configurations
     /// * `txt` - The string to format
-    /// * `color_name` - The name of the color to use
-    /// * `is_bg` - Whether to use the color as a background color
+    /// * `style` - The style format containing color information and scope
     ///
     /// # Returns
     ///
     /// A string with the color applied
-    pub fn format<'a>(
-        colours: &FallbackMap<str, String>,
-        txt: &'a str,
-        color_name: &str,
-        is_bg: bool,
-    ) -> String {
-        match ColorManager::get_style(colours, color_name) {
-            Some(c) => {
-                let mut style = Style::new();
-                style = if is_bg { style.on(c) } else { style.fg(c) };
-                style.paint(txt).to_string()
+    pub fn format<'a>(colours: &Context, txt: &'a str, style: StyleFormat) -> String {
+        let mut style_obj = Style::new();
+
+        // Apply foreground color if present
+        if let Some(fg) = style.fg_color {
+            if let Some(c) = ColorManager::get_style(colours, &fg) {
+                style_obj = style_obj.fg(c);
             }
-            None => txt.to_owned(),
         }
+
+        // Apply background color if present
+        if let Some(bg) = style.bg_color {
+            if let Some(c) = ColorManager::get_style(colours, &bg) {
+                style_obj = style_obj.on(c);
+            }
+        }
+
+        style_obj.paint(txt).to_string()
     }
 
     /// Process the colour style supplied in one of the following variants supported by the
@@ -60,36 +78,46 @@ impl ColorManager {
     ///
     /// A color object
     ///
-    fn get_style(colours: &FallbackMap<str, String>, color_name: &str) -> Option<Color> {
-        match colours.get(color_name) {
-            Some(c) => {
-                if RGB_REGEX.is_match(c) {
-                    let groups = RGB_REGEX.captures(c).unwrap();
-                    let r: u8 = groups.get(1).map_or("", |m| m.as_str()).parse().unwrap();
-                    let g: u8 = groups.get(2).map_or("", |m| m.as_str()).parse().unwrap();
-                    let b: u8 = groups.get(3).map_or("", |m| m.as_str()).parse().unwrap();
-                    Some(Color::Rgb(r, g, b))
-                } else if FNAME_REGEX.is_match(c) {
-                    let groups = FNAME_REGEX.captures(c).unwrap();
-                    let operator = groups
-                        .get(2)
-                        .or_else(|| groups.get(4))
-                        .map_or("", |m| m.as_str())
-                        .to_uppercase();
-                    if operator == "FIXED" {
-                        Some(Fixed(
-                            groups.get(3).map_or("", |m| m.as_str()).parse().unwrap(),
-                        ))
-                    } else if operator == "NAME" {
-                        ColorManager::to_colour_name(groups.get(5).map_or("", |m| m.as_str()))
-                    } else {
-                        None
-                    }
-                } else {
-                    ColorManager::get_style(colours, c)
-                }
+    fn get_style(colours: &Context, color_name: &str) -> Option<Color> {
+        let computed_color = colours.get(color_name).unwrap_or(color_name);
+        ColorManager::process_color(colours, computed_color)
+    }
+
+    /// Process a color string into a Color object
+    ///
+    /// # Arguments
+    ///
+    /// * `colours` - A reference to the fallback map containing color configurations
+    /// * `color_str` - The color string to process
+    ///
+    /// # Returns
+    ///
+    /// A color object
+    fn process_color(colours: &Context, color_str: &str) -> Option<Color> {
+        if RGB_REGEX.is_match(color_str) {
+            let groups = RGB_REGEX.captures(color_str).unwrap();
+            let r: u8 = groups.get(1).map_or("", |m| m.as_str()).parse().unwrap();
+            let g: u8 = groups.get(2).map_or("", |m| m.as_str()).parse().unwrap();
+            let b: u8 = groups.get(3).map_or("", |m| m.as_str()).parse().unwrap();
+            Some(Color::Rgb(r, g, b))
+        } else if FNAME_REGEX.is_match(color_str) {
+            let groups = FNAME_REGEX.captures(color_str).unwrap();
+            let operator = groups
+                .get(2)
+                .or_else(|| groups.get(4))
+                .map_or("", |m| m.as_str())
+                .to_uppercase();
+            if operator == "FIXED" {
+                Some(Fixed(
+                    groups.get(3).map_or("", |m| m.as_str()).parse().unwrap(),
+                ))
+            } else if operator == "NAME" {
+                ColorManager::to_colour_name(groups.get(5).map_or("", |m| m.as_str()))
+            } else {
+                None
             }
-            None => None,
+        } else {
+            ColorManager::get_style(colours, color_str)
         }
     }
 

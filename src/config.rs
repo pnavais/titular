@@ -1,14 +1,15 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use chrono::Local;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json;
 
-use crate::{error::*, fallback_map::MapProvider};
+use crate::error::*;
 
 pub const DEFAULT_TEMPLATE_EXT: &str = ".tl";
 pub const DEFAULT_TEMPLATE_NAME: &str = "basic";
@@ -32,7 +33,7 @@ pub enum Display {
 pub struct MainConfig {
     pub defaults: Defaults,
     #[serde(default)]
-    pub vars: HashMap<String, String>,
+    pub vars: BTreeMap<String, String>,
     pub templates: Templates,
 }
 
@@ -66,7 +67,7 @@ pub struct Templates {
 pub struct TemplateConfig {
     pub details: Details,
     #[serde(default)]
-    pub vars: HashMap<String, String>,
+    pub vars: BTreeMap<String, String>,
     pub pattern: Pattern,
 }
 
@@ -129,7 +130,7 @@ impl MainConfig {
     /// Perfoms custom initialization using the main configuration values
     pub fn init(&mut self) {
         // Keep defaults as vars
-        self.defaults.to_hashmap().iter().for_each(|(k, v)| {
+        self.defaults.to_map().iter().for_each(|(k, v)| {
             self.vars
                 .insert(format!("defaults.{}", k.to_string()), v.to_string());
         });
@@ -138,66 +139,6 @@ impl MainConfig {
             "time".to_owned(),
             Local::now().format(&self.defaults.time_format).to_string(),
         );
-    }
-}
-
-impl MapProvider<str, String> for MainConfig {
-    fn contains(&self, key: &str) -> bool {
-        self.vars.contains_key(key)
-    }
-
-    fn resolve(&self, key: &str) -> Option<&String> {
-        self.vars.get(key)
-    }
-
-    fn is_active(&self, key: &str) -> bool {
-        match self.resolve(key) {
-            Some(v) => v == "true",
-            None => false,
-        }
-    }
-
-    fn debug_entries(&self) -> Option<Vec<(String, String)>> {
-        Some(
-            self.vars
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<Vec<_>>(),
-        )
-    }
-
-    fn get_name(&self) -> Option<String> {
-        Some("MainConfig".to_string())
-    }
-}
-
-impl MapProvider<str, String> for TemplateConfig {
-    fn contains(&self, key: &str) -> bool {
-        self.vars.contains_key(key)
-    }
-
-    fn resolve(&self, key: &str) -> Option<&String> {
-        self.vars.get(key)
-    }
-
-    fn is_active(&self, key: &str) -> bool {
-        match self.resolve(key) {
-            Some(v) => v == "true",
-            None => false,
-        }
-    }
-
-    fn debug_entries(&self) -> Option<Vec<(String, String)>> {
-        Some(
-            self.vars
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<Vec<_>>(),
-        )
-    }
-
-    fn get_name(&self) -> Option<String> {
-        Some("TemplateConfig".to_string())
     }
 }
 
@@ -224,12 +165,12 @@ pub fn parse(file_path: &PathBuf) -> Result<String> {
 }
 
 impl Defaults {
-    pub fn to_hashmap(&self) -> HashMap<String, String> {
+    pub fn to_map(&self) -> BTreeMap<String, String> {
         // Convert the struct to a JSON value
         let json_value = serde_json::to_value(self).unwrap();
 
         // Convert JSON object to HashMap
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         if let serde_json::Value::Object(obj) = json_value {
             for (key, value) in obj {
                 if let serde_json::Value::String(s) = value {

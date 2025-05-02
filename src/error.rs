@@ -1,3 +1,4 @@
+use std::error::Error as StdError;
 use std::io::Write;
 use strum_macros::Display;
 use thiserror::Error;
@@ -40,6 +41,8 @@ pub enum Error {
     #[cfg(feature = "display")]
     #[error(transparent)]
     SyntectError(#[from] ::syntect::Error),
+    #[error("unable to interpolate variable. Cause : {cause}")]
+    InterpolationError { location: ConfigType, cause: String },
     #[error(transparent)]
     Io(#[from] ::std::io::Error),
     #[cfg(feature = "fetcher")]
@@ -50,10 +53,12 @@ pub enum Error {
     TemplateDownloadError(String, String),
     #[error("unable to open template file {file:?}. Cause : {cause}")]
     TemplateNotFound { file: String, cause: String },
+    #[error("Tera error: {0} (source: {1})")]
+    TeraError(::tera::Error, String),
     #[error("unable to read template file {file:?}. Cause : {cause}")]
     TemplateReadError { file: String, cause: String },
-    #[error("unable to interpolate variable. Cause : {cause}")]
-    InterpolationError { location: ConfigType, cause: String },
+    #[error("unable to render template. Cause : {0}")]
+    TemplateRenderError(String),
     #[error("error writing to template. Cause : {0}")]
     TemplateWriteError(String),
     #[error("{0}")]
@@ -91,6 +96,19 @@ impl From<String> for Error {
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Self {
         Error::JsonError(error.to_string())
+    }
+}
+
+impl From<tera::Error> for Error {
+    fn from(error: tera::Error) -> Self {
+        let mut error_chain = error.to_string();
+        let mut current = error.source();
+        while let Some(source) = current {
+            error_chain.push_str("\nCaused by: ");
+            error_chain.push_str(&source.to_string());
+            current = source.source();
+        }
+        Error::TeraError(error, error_chain)
     }
 }
 
