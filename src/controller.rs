@@ -291,7 +291,7 @@ impl<'a> TemplatesController<'a> {
         if template.exists() {
             // Create a fallback map with the config and the context
             let mut context_map = Context::from(&self.config.vars);
-            context_map.extend_from(context);
+            context_map.append_from(context);
             return match display::display_template(&template, &context_map) {
                 Ok(_) => Ok(true),
                 Err(e) => Err(Error::TemplateReadError {
@@ -371,9 +371,9 @@ impl<'a> TemplatesController<'a> {
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
         // Create a fallback map with the template vars, config and context
         let mut full_context = Context::new();
-        full_context.extend(&template_payload.vars);
-        full_context.extend(&self.config.vars);
-        full_context.extend_from(context);
+        full_context.append_from(context);
+        full_context.append(&template_payload.vars);
+        full_context.append(&self.config.vars);
 
         let formatted = TemplateFormatter::new(full_context).format(&template_payload)?;
         writeln!(std::io::stdout(), "{}", formatted)?;

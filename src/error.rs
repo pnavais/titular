@@ -28,6 +28,10 @@ pub enum Error {
     ConfigReadError { file: String, cause: String },
     #[error("Error executing command. Cause : {0}")]
     CommandError(String),
+    #[error("Cyclic reference detected for variable: {0}")]
+    ContextCyclicReference(String),
+    #[error("Variable not found: {0}")]
+    ContextVariableNotFound(String),
     #[error(transparent)]
     Fmt(#[from] ::std::fmt::Error),
     #[error("unable to parse {location} file {file:?}. Cause : {cause}")]

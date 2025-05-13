@@ -40,6 +40,7 @@ pub mod formatter;
 #[cfg(feature = "fetcher")]
 pub mod github;
 pub mod log;
+pub mod processor;
 pub mod reader;
 pub mod style_filter;
 #[cfg(feature = "minimal")]

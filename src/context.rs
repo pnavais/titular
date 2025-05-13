@@ -1,6 +1,7 @@
+use crate::error::{Error, Result};
 use serde::Serialize;
 use serde_json::value::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tera::Context as TeraContext;
 
 #[derive(Debug)]
@@ -24,6 +25,57 @@ impl Context {
         }
     }
 
+    /// Resolves a variable reference in the format $var or ${var:default_value}
+    fn resolve_variable(&self, value: &str, visited: &mut HashMap<String, bool>) -> Result<String> {
+        // Check if the value is a variable reference
+        if !value.starts_with('$') {
+            return Ok(value.to_string());
+        }
+
+        // Extract variable name and default value if present
+        let (var_name, default_value) = if value.starts_with("${") && value.ends_with('}') {
+            let content = &value[2..value.len() - 1];
+            match content.split_once(':') {
+                Some((name, default)) => (name, Some(default)),
+                None => (content, None),
+            }
+        } else if value.starts_with('$') {
+            (&value[1..], None)
+        } else {
+            return Ok(value.to_string());
+        };
+
+        // Check for cycles
+        if visited.contains_key(var_name) {
+            return Err(Error::ContextCyclicReference(var_name.to_string()));
+        }
+
+        // Mark as visited
+        visited.insert(var_name.to_string(), true);
+
+        // Get the value from context
+        let resolved = match self.get(var_name) {
+            Some(value) => value.to_string(),
+            None => {
+                // If no value found and we have a default, try to resolve it
+                if let Some(default) = default_value {
+                    // Recursively resolve the default value
+                    self.resolve_variable(&format!("${}", default), visited)?
+                } else {
+                    return Err(Error::ContextVariableNotFound(var_name.to_string()));
+                }
+            }
+        };
+
+        // Recursively resolve any nested variables
+        let final_value = self.resolve_variable(&resolved, visited)?;
+
+        // Remove from visited set
+        visited.remove(var_name);
+
+        Ok(final_value)
+    }
+
     /// Returns a reference to the underlying tera context
     pub fn get_data(&self) -> &TeraContext {
         &self.data
@@ -33,7 +85,7 @@ impl Context {
     where
         I: IntoIterator<Item = (K, V)>,
         K: Into<String>,
-        V: Serialize,
+        V: Serialize + std::fmt::Display,
     {
         let mut context_map = Context::new();
         for (key, value) in context {
@@ -51,7 +103,7 @@ impl Context {
     where
         I: IntoIterator<Item = (K, V)>,
         K: Into<String>,
-        V: Serialize,
+        V: Serialize + std::fmt::Display,
     {
         for (key, value) in context {
             self.insert(key, &value);
@@ -62,7 +114,24 @@ impl Context {
     ///
     /// # Arguments
     /// * `context` - The context to extend the current context with.
-    pub fn extend_from(&mut self, context: &Context) {
+    pub fn append<I, K, V>(&mut self, context: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String> + AsRef<str>,
+        V: Serialize + std::fmt::Display,
+    {
+        for (key, value) in context {
+            if !self.contains(key.as_ref()) {
+                self.insert(key, &value);
+            }
+        }
+    }
+
+    /// Extends the context with the given context replacing existing keys.
+    ///
+    /// # Arguments
+    /// * `context` - The context to extend the current context with.
+    pub fn append_from(&mut self, context: &Context) {
         for key in &context.keys {
             if let Some(value) = context.get_raw(key) {
                 self.insert(*key, value);
@@ -75,9 +144,26 @@ impl Context {
     /// # Arguments
     /// * `key` - The key to insert the value into.
     /// * `val` - The value to insert into the context.
-    pub fn insert<T: Serialize + ?Sized, S: Into<String>>(&mut self, key: S, val: &T) {
-        let key_ref: &'static str = Box::leak(key.into().into_boxed_str());
-        self.data.insert(key_ref, val);
+    pub fn insert<T: Serialize + std::fmt::Display + ?Sized, S: Into<String>>(
+        &mut self,
+        key: S,
+        val: &T,
+    ) {
+        let key_str = key.into();
+        let value = match serde_json::to_value(val) {
+            Ok(Value::String(s)) => {
+                // Try to resolve variable references
+                match self.resolve_variable(&s, &mut HashMap::new()) {
+                    Ok(resolved) => Value::String(resolved),
+                    Err(_) => Value::String(if s.starts_with('$') { String::new() } else { s }),
+                }
+            }
+            Ok(v) => v,
+            Err(_) => Value::String(val.to_string()),
+        };
+
+        let key_ref: &'static str = Box::leak(key_str.into_boxed_str());
+        self.data.insert(key_ref, &value);
         self.keys.insert(key_ref);
     }
 
@@ -172,12 +258,15 @@ impl Context {
     /// * `key` - The key to insert the values into.
     /// * `values` - The values to insert into the context.
     pub fn insert_many(&mut self, key: &str, values: Vec<&str>) {
-        let json_values = Value::Array(
-            values
-                .into_iter()
-                .map(|v| Value::String(v.to_string()))
-                .collect(),
-        );
+        let resolved_values: Vec<Value> = values
+            .into_iter()
+            .map(|v| match self.resolve_variable(v, &mut HashMap::new()) {
+                Ok(resolved) => Value::String(resolved),
+                Err(_) => Value::String(v.to_string()),
+            })
+            .collect();
+
+        let json_values = Value::Array(resolved_values);
 
         let key_ref: &'static str = Box::leak(key.to_string().into_boxed_str());
         self.data.insert(key_ref, &json_values);

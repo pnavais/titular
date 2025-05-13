@@ -8,6 +8,7 @@ use crate::color_filter;
 use crate::config::TemplateConfig;
 use crate::context::Context;
 use crate::error::*;
+use crate::processor::TextProcessor;
 use crate::style_filter;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
@@ -95,6 +96,9 @@ impl TemplateFormatter {
                 }
                 Error::TemplateRenderError(error_msg)
             })?;
-        Ok(template)
+
+        // Process padding in the rendered template
+        let processor = TextProcessor::default();
+        Ok(processor.process_padding(&template))
     }
 }

@@ -28,6 +28,7 @@ pub fn build_app(interactive_output: bool) -> Command {
     .version(crate_version!())
     .about(crate_description!())
     .color(color_when)
+    .allow_hyphen_values(true)
     .arg(
         arg!(-t --template <VALUE> "Template to use for the title")
         .long_help(

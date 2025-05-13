@@ -2286,6 +2286,7 @@ dependencies = [
  "chrono",
  "clap",
  "clap-num",
+ "console",
  "crossterm",
  "ctrlc",
  "directories",
