@@ -1,4 +1,5 @@
 use crate::error::*;
+use console::measure_text_width;
 use nu_ansi_term::Color::{Blue, Yellow};
 use std::path::PathBuf;
 use std::process::Command;
@@ -247,6 +248,71 @@ pub fn expand_to_width(content: &str, target_width: usize) -> String {
     result
 }
 
+/// Expands a string to the target display width by repeating it until it reaches the target width
+/// Takes into account the display width of characters (e.g., emojis and Chinese characters are 2 characters wide)
+///
+/// # Arguments
+/// * `content` - The content to expand
+/// * `target_width` - The target display width to reach
+///
+/// # Returns
+/// A string expanded to the target display width
+///
+/// # Examples
+/// ```
+/// use titular::utils::expand_to_display_width;
+///
+/// // Normal characters (1 width each)
+/// assert_eq!(expand_to_display_width("X", 3), "XXX");
+///
+/// // Emoji (2 width each)
+/// assert_eq!(expand_to_display_width("🦀", 4), "🦀🦀");
+/// assert_eq!(expand_to_display_width("🦀", 5), "🦀🦀"); // Can't add another emoji (2 width) to remaining 1 width
+///
+/// // Chinese character (2 width each)
+/// assert_eq!(expand_to_display_width("漢", 3), "漢"); // Can't add another character (2 width) to remaining 1 width
+/// assert_eq!(expand_to_display_width("漢", 4), "漢漢");
+///
+/// // Mixed content
+/// assert_eq!(expand_to_display_width("A🦀", 5), "A🦀A"); // A(1) + 🦀(2) + A(1) = 4 width
+/// ```
+pub fn expand_to_display_width(content: &str, target_width: usize) -> String {
+    if content.is_empty() || target_width == 0 {
+        return String::new();
+    }
+
+    let content_width = measure_text_width(content);
+    if content_width == 0 {
+        return String::new();
+    }
+
+    // For display width, we need to handle partial repetitions
+    let mut result = String::new();
+    let mut current_width = 0;
+
+    while current_width < target_width {
+        // If adding the entire content would exceed the target width,
+        // we need to add graphemes one by one
+        if current_width + content_width > target_width {
+            let remaining_width = target_width - current_width;
+            let mut partial_width = 0;
+            for g in content.graphemes(true) {
+                let g_width = measure_text_width(g);
+                if partial_width + g_width > remaining_width {
+                    break;
+                }
+                result.push_str(g);
+                partial_width += g_width;
+            }
+            break;
+        }
+        result.push_str(content);
+        current_width += content_width;
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -460,5 +526,37 @@ mod tests {
         assert_eq!(expand_to_width("🌟", 4), "🌟🌟🌟🌟");
         assert_eq!(expand_to_width("👨‍👩‍👧‍👦", 2), "👨‍👩‍👧‍👦👨‍👩‍👧‍👦");
         assert_eq!(expand_to_width("👨‍👩‍👧‍👦", 3), "👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦");
+    }
+
+    #[test]
+    fn test_expand_to_display_width() {
+        // Test empty cases
+        assert_eq!(expand_to_display_width("", 10), "");
+        assert_eq!(expand_to_display_width("test", 0), "");
+        assert_eq!(expand_to_display_width("", 0), "");
+
+        // Test normal characters (1 width each)
+        assert_eq!(expand_to_display_width("X", 3), "XXX");
+        assert_eq!(expand_to_display_width("XY", 3), "XYX");
+        assert_eq!(expand_to_display_width("XY", 5), "XYXYX");
+
+        // Test emojis (2 width each)
+        assert_eq!(expand_to_display_width("🦀", 4), "🦀🦀");
+        assert_eq!(expand_to_display_width("🦀", 5), "🦀🦀"); // Can't add another emoji (2 width) to remaining 1 width
+        assert_eq!(expand_to_display_width("🦀", 6), "🦀🦀🦀"); // 3 full emojis (6 width)
+        assert_eq!(expand_to_display_width("🌟", 6), "🌟🌟🌟");
+
+        // Test mixed content
+        assert_eq!(expand_to_display_width("A🦀", 5), "A🦀A"); // A(1) + 🦀(2) + A(1) = 4 width
+        assert_eq!(expand_to_display_width("🦀A", 5), "🦀A🦀"); // 🦀(2) + A(1) + 🦀(2) = 5 width
+        assert_eq!(expand_to_display_width("A🦀B", 7), "A🦀BA🦀"); // A(1) + 🦀(2) + B(1) + A(1) + 🦀(2) = 7 width
+
+        // Test Unicode characters
+        assert_eq!(expand_to_display_width("★", 3), "★★★");
+        assert_eq!(expand_to_display_width("→", 4), "→→→→");
+        assert_eq!(expand_to_display_width("ñ", 3), "ñññ");
+        assert_eq!(expand_to_display_width("漢", 3), "漢"); // Can't add another character (2 width) to remaining 1 width
+        assert_eq!(expand_to_display_width("漢", 4), "漢漢"); // Two full characters (4 width)
+        assert_eq!(expand_to_display_width("漢", 6), "漢漢漢"); // Three full characters (6 width)
     }
 }

@@ -3,14 +3,13 @@ use crate::utils;
 use console::measure_text_width;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Represents a matched padding group with its position and width information
 struct MatchedGroup {
     content: String,
     start: usize,
     end: usize,
-    full_width: usize,
-    content_width: usize,
 }
 
 // Regex to match pad() calls, including nested ones
@@ -95,42 +94,27 @@ impl TextProcessor {
             ((remaining_space as f64) / (non_empty_groups as f64)).ceil() as usize;
         let is_exact_division = (remaining_space as f64) % (non_empty_groups as f64) == 0.0;
 
-        // Print the collected information
-        println!("\nPadding Groups Information:");
-        println!("------------------------");
-        for group in &padding_groups {
-            println!("Content: '{}'", group.content);
-            println!("  Position: {} to {}", group.start, group.end);
-            println!("  Full match width: {}", group.full_width);
-            println!("  Content width: {}", group.content_width);
-            println!("  Character count: {}", group.content.chars().count());
-            println!("------------------------");
-        }
-        println!("Total occupied space: {}", occupied_space);
-        println!("Remaining space to fill: {}", remaining_space);
-        println!("Available space: {}", (self.get_width)());
-        println!("Number of non-empty padding groups: {}", non_empty_groups);
-        println!("Space per group: {}", space_per_group);
-        println!("Is exact division: {}", is_exact_division);
-
         // Replace each padding group with its content followed by its expanded content
         let mut result = content.to_string();
         for (i, group) in padding_groups.iter().rev().enumerate() {
             let start = group.start;
             let end = group.end;
             let replacement = if !group.content.is_empty() {
-                // If this is the first group (from right) and division isn't exact, use one less space
+                // If this is the first group (from right) and division isn't exact
                 let space = if i == 0 && !is_exact_division {
-                    space_per_group - 1
+                    let base_space = space_per_group - 1;
+                    // For single graphemes (emojis or other single characters),
+                    // ensure the space is a multiple of their width
+                    if group.content.graphemes(true).count() == 1 {
+                        let width = measure_text_width(&group.content);
+                        base_space + (width - (base_space % width))
+                    } else {
+                        base_space
+                    }
                 } else {
                     space_per_group
                 };
-                let expanded = utils::expand_to_width(&group.content, space);
-                println!(
-                    "Expanded content: {} with width {}",
-                    expanded,
-                    measure_text_width(&expanded)
-                );
+                let expanded = utils::expand_to_display_width(&group.content, space);
                 format!("{}{}", group.content, expanded)
             } else {
                 String::new()
@@ -138,8 +122,7 @@ impl TextProcessor {
             result.replace_range(start..end, &replacement);
         }
 
-        println!("Result width: {}", measure_text_width(&result));
-        format!("{}|", result)
+        result
     }
 
     /// Extract padding groups from the content and calculate their information
@@ -180,8 +163,6 @@ impl TextProcessor {
                 content: pad_content.to_string(),
                 start: full_match.start(),
                 end: full_match.end(),
-                full_width: measure_text_width(full_match.as_str()),
-                content_width,
             };
 
             if !matched_group.content.is_empty() {
