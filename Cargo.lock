@@ -2311,6 +2311,7 @@ dependencies = [
  "term_size",
  "thiserror 2.0.12",
  "toml",
+ "unicode-segmentation",
  "url",
  "whoami",
 ]

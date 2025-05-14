@@ -2,6 +2,7 @@ use crate::error::*;
 use nu_ansi_term::Color::{Blue, Yellow};
 use std::path::PathBuf;
 use std::process::Command;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub const ROOT_PREFIX: &str = "\u{f115}";
 pub const ELEMENT_PREFIX: &str = "\u{ea7b}";
@@ -228,6 +229,24 @@ pub fn remove_backup(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Expands a string to the target width by repeating it until it reaches the target number of characters
+pub fn expand_to_width(content: &str, target_width: usize) -> String {
+    if content.is_empty() || target_width == 0 {
+        return String::new();
+    }
+
+    let mut result = String::new();
+    let mut graphemes = content.graphemes(true).cycle();
+
+    for _ in 0..target_width {
+        if let Some(g) = graphemes.next() {
+            result.push_str(g);
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -412,5 +431,34 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_expand_to_width() {
+        // Test empty cases
+        assert_eq!(expand_to_width("", 10), "");
+        assert_eq!(expand_to_width("test", 0), "");
+        assert_eq!(expand_to_width("", 0), "");
+
+        // Test single character expansion
+        assert_eq!(expand_to_width("X", 3), "XXX");
+        assert_eq!(expand_to_width("X", 5), "XXXXX");
+
+        // Test multi-character expansion
+        assert_eq!(expand_to_width("XY", 3), "XYX");
+        assert_eq!(expand_to_width("XY", 5), "XYXYX");
+
+        // Test Unicode characters
+        assert_eq!(expand_to_width("★", 3), "★★★");
+        assert_eq!(expand_to_width("→", 4), "→→→→");
+        assert_eq!(expand_to_width("ñ", 3), "ñññ");
+        assert_eq!(expand_to_width("漢", 3), "漢漢漢");
+        assert_eq!(expand_to_width("漢漢", 3), "漢漢漢");
+
+        // Test emojis
+        assert_eq!(expand_to_width("😊", 3), "😊😊😊");
+        assert_eq!(expand_to_width("🌟", 4), "🌟🌟🌟🌟");
+        assert_eq!(expand_to_width("👨‍👩‍👧‍👦", 2), "👨‍👩‍👧‍👦👨‍👩‍👧‍👦");
+        assert_eq!(expand_to_width("👨‍👩‍👧‍👦", 3), "👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦");
     }
 }
