@@ -13,14 +13,8 @@ struct MatchedGroup {
 }
 
 // Regex to match pad() calls, including nested ones
-static PAD_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    // This pattern matches:
-    // - pad( followed by any content that doesn't contain unmatched parentheses
-    // - The content can include nested pad() calls
-    // - Ends with )
-    // - Captures the content inside the parentheses
-    Regex::new(r"pad\(((?:[^()]|\([^()]*\))*)\)").unwrap()
-});
+static PAD_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"pad\(((?:[^()]|\([^()]*\))*)\)").unwrap());
 
 pub struct TextProcessor {
     get_width: Box<dyn Fn() -> usize + Send + Sync>,
@@ -87,30 +81,31 @@ impl TextProcessor {
             return content.to_string();
         }
 
-        let (padding_groups, occupied_space, non_empty_groups) =
-            self.extract_padding_groups(content, &pad_groups);
-        let remaining_space = (self.get_width)().saturating_sub(occupied_space);
-        let space_per_group =
-            ((remaining_space as f64) / (non_empty_groups as f64)).ceil() as usize;
-        let is_exact_division = (remaining_space as f64) % (non_empty_groups as f64) == 0.0;
+        // Recursively process the content inside each pad() group
+        let mut processed = content.to_string();
+        for cap in PAD_PATTERN.captures_iter(content) {
+            if let Some(m) = cap.get(1) {
+                let inner = self.process_padding_line(m.as_str());
+                let full = cap.get(0).unwrap();
+                processed.replace_range(full.start()..full.end(), &format!("pad({})", inner));
+            }
+        }
 
-        // Replace each padding group with its content followed by its expanded content
-        let mut result = content.to_string();
+        // Now extract the pad() groups again from the processed string
+        let pad_groups: Vec<_> = PAD_PATTERN.captures_iter(&processed).collect();
+        let (padding_groups, occupied_space, non_empty_groups) =
+            self.extract_padding_groups(&processed, &pad_groups);
+        let remaining_space = (self.get_width)().saturating_sub(occupied_space);
+        let space_per_group = remaining_space / non_empty_groups;
+        let extra_space = remaining_space % non_empty_groups;
+        let mut result = processed.to_string();
         for (i, group) in padding_groups.iter().rev().enumerate() {
             let start = group.start;
             let end = group.end;
             let replacement = if !group.content.is_empty() {
-                // If this is the first group (from right) and division isn't exact
-                let space = if i == 0 && !is_exact_division {
-                    let base_space = space_per_group - 1;
-                    // For single graphemes (emojis or other single characters),
-                    // ensure the space is a multiple of their width
-                    if group.content.graphemes(true).count() == 1 {
-                        let width = measure_text_width(&group.content);
-                        base_space + (width - (base_space % width))
-                    } else {
-                        base_space
-                    }
+                // For the last group, add any extra space from the remainder
+                let space = if i == non_empty_groups - 1 {
+                    space_per_group + extra_space
                 } else {
                     space_per_group
                 };
@@ -121,7 +116,6 @@ impl TextProcessor {
             };
             result.replace_range(start..end, &replacement);
         }
-
         result
     }
 
@@ -181,5 +175,135 @@ impl TextProcessor {
         }
 
         (padding_groups, occupied_space, non_empty_groups)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper function to debug test output
+    fn debug_output(result: &str) {
+        println!("\nDebug output for: {}", result);
+        println!("Total width: {}", measure_text_width(result));
+        println!("Character by character:");
+        for (i, c) in result.char_indices() {
+            println!(
+                "  {}: '{}' (width: {})",
+                i,
+                c,
+                measure_text_width(&c.to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn test_process_padding_no_padding() {
+        let processor = TextProcessor::with_width(80);
+        let input = "Hello, World!";
+        assert_eq!(processor.process_padding(input), input);
+    }
+
+    #[test]
+    fn test_process_padding_single_padding() {
+        let processor = TextProcessor::with_width(20);
+        let input = "Hello pad(+) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello ++++++++ World");
+        assert_eq!(measure_text_width(&result), 20);
+    }
+
+    #[test]
+    fn test_process_padding_multiple_padding() {
+        let processor = TextProcessor::with_width(30);
+        let input = "Hello pad(+) pad(-) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello +++++++++ -------- World");
+        assert_eq!(measure_text_width(&result), 30);
+    }
+
+    #[test]
+    fn test_process_padding_with_emoji() {
+        let processor = TextProcessor::with_width(20);
+        let input = "Hello pad(🦀) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello 🦀 World");
+        assert_eq!(measure_text_width(&result), 14);
+    }
+
+    #[test]
+    fn test_process_padding_with_family_emoji() {
+        let processor = TextProcessor::with_width(30);
+        let input = "Hello pad(👨‍👩‍👧‍👦) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello 👨‍👩‍👧‍👦 World");
+        assert_eq!(measure_text_width(&result), 14);
+    }
+
+    #[test]
+    fn test_process_padding_multiline() {
+        let processor = TextProcessor::with_width(20);
+        let input = "Hello pad(+)\nWorld pad(-)";
+        let result = processor.process_padding(input);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 2);
+        debug_output(lines[0]);
+        debug_output(lines[1]);
+        assert_eq!(lines[0], "Hello +");
+        assert_eq!(lines[1], "World -");
+        assert_eq!(measure_text_width(lines[0]), 7);
+        assert_eq!(measure_text_width(lines[1]), 7);
+    }
+
+    #[test]
+    fn test_process_padding_empty_content() {
+        let processor = TextProcessor::with_width(20);
+        let input = "pad()";
+        let result = processor.process_padding(input);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_process_padding_nested_padding() {
+        let processor = TextProcessor::with_width(30);
+        let input = "Hello pad(pad(+)) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello + World");
+        assert_eq!(measure_text_width(&result), 13);
+    }
+
+    #[test]
+    fn test_process_padding_exact_division() {
+        let processor = TextProcessor::with_width(20);
+        let input = "Hello pad(+) pad(+) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello + + World");
+        assert_eq!(measure_text_width(&result), 15);
+    }
+
+    #[test]
+    fn test_process_padding_mixed_content() {
+        let processor = TextProcessor::with_width(30);
+        let input = "Hello pad(🦀) pad(+) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello 🦀 + World");
+        assert_eq!(measure_text_width(&result), 16);
+    }
+
+    #[test]
+    fn test_process_padding_with_rainbow_flag() {
+        let processor = TextProcessor::with_width(30);
+        let input = "Hello pad(🏳️‍🌈) World";
+        let result = processor.process_padding(input);
+        debug_output(&result);
+        assert_eq!(result, "Hello 🏳️‍🌈 World");
+        assert!(measure_text_width(&result) >= 14); // Rainbow flag width can vary
     }
 }
