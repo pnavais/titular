@@ -389,15 +389,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clap-num"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "822c4000301ac390e65995c62207501e3ef800a1fc441df913a5e8e4dc374816"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "clap_builder"
 version = "4.5.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1738,6 +1729,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
+name = "print-positions"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1df593470e3ef502e48cb0cfc9a3a61e5f61e967b78e1ed35a67ac615cfbd208"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2285,7 +2285,6 @@ dependencies = [
  "build-print",
  "chrono",
  "clap",
- "clap-num",
  "console",
  "crossterm",
  "ctrlc",
@@ -2298,6 +2297,7 @@ dependencies = [
  "nu-ansi-term",
  "once_cell",
  "pager",
+ "print-positions",
  "regex",
  "serde",
  "serde_json",
@@ -2312,6 +2312,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "unicode-segmentation",
+ "unicode-width",
  "url",
  "whoami",
 ]

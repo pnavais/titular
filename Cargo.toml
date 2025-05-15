@@ -2,13 +2,15 @@
 name = "titular"
 version = "0.1.0"
 edition = "2021"
-description = "A command line tool to display fancy titles in your terminal"
 authors = ["Pablo Navais <pnavais@gmail.com>"]
+description = "A command line tool to display fancy titles in your terminal"
 license = "MIT OR Apache-2.0"
+readme = "README.md"
 repository = "https://github.com/pnavais/titular"
 documentation = "https://docs.rs/titular"
-readme = "README.md"
 build = "build.rs"
+keywords = ["cli", "text", "syntax-highlighting", "formatting"]
+categories = ["command-line-utilities", "text-processing"]
 
 [lib]
 name = "titular"
@@ -21,7 +23,6 @@ path = "src/bin/titular/main.rs"
 [dependencies]
 chrono = "0.4"
 clap = { version = "4.5.4", features = ["derive", "cargo", "wrap_help"] }
-clap-num = "1.0.0"
 console = "0.15"
 crossterm = { version = "0.29", optional = true }
 ctrlc = { version = "3.2.5", optional = true, features = ["termination"] }
@@ -34,6 +35,7 @@ isahc = { version = "1.7.2", optional = true }
 nu-ansi-term = "0.50"
 once_cell = "1.19"
 pager = { version = "0.16.1" }
+print-positions = "0.6.1"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 shellexpand = "3.1"
@@ -50,14 +52,15 @@ bincode = { version = "2.0", optional = true, features = ["serde"] }
 regex = "1.10"
 tera = { version = "1", default-features = false }
 unicode-segmentation = "1.12.0"
+unicode-width = "0.2"
 
 [build-dependencies]
 syntect = { version = "5.2.0", features = ["dump-load"], optional = true }
 bincode = { version = "2.0", optional = true, features = ["serde"] }
 serde = { version = "1.0.197", features = ["derive"] }
 sublime-color-scheme = { version = "0.1.2", optional = true }
-build-print = "0.1.1"
 nu-ansi-term = "0.50"
+build-print = "0.1.1"
 
 [dev-dependencies]
 tempfile = "3.10"

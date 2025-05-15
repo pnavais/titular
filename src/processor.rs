@@ -1,5 +1,4 @@
 use crate::term::TERM_SIZE;
-use crate::utils;
 use console::strip_ansi_codes;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -10,7 +9,7 @@ struct MatchedGroup {
     content: String,
     start: usize,
     end: usize,
-    grapheme_count: usize,
+    width: usize,
 }
 
 // Regex to match pad() calls, including nested ones
@@ -93,24 +92,14 @@ impl TextProcessor {
             0
         };
 
-        println!("occupied_space: {}", occupied_space);
-        println!("width: {}", target_width);
-        println!("non_empty_groups: {}", non_empty_groups);
-        println!("remaining_space: {}", remaining_space);
-        println!("space_per_group: {}", space_per_group);
-
-        // Debug padding groups
-        println!("\nPadding Groups:");
-        for (i, group) in padding_groups.iter().enumerate() {
-            println!("Group {}:", i);
-            println!("  Content: '{}'", group.content);
-            println!("  Start: {}", group.start);
-            println!("  End: {}", group.end);
-            println!("  Width: {}", group.grapheme_count);
-            println!("  Is Empty: {}", group.content.is_empty());
+        let mut result = content.to_string();
+        for group in padding_groups.iter().rev() {
+            let start = group.start;
+            let end = group.end;
+            result.replace_range(start..end, &group.content);
         }
 
-        content.to_string()
+        result
     }
 
     /// Extract padding groups from the content and calculate their information
@@ -129,53 +118,50 @@ impl TextProcessor {
         content: &str,
         pad_groups: &[regex::Captures],
     ) -> (Vec<MatchedGroup>, usize, usize) {
-        let mut padding_groups = Vec::new();
-        let mut occupied_space = 0;
-        let mut non_empty_groups = 0;
         let mut last_end = 0;
+        let mut occupied_space = 0;
 
-        // Find matches in the content
-        for group in pad_groups {
-            let full_match = group.get(0).unwrap();
-            let pad_content = &group[1];
+        let padding_groups: Vec<MatchedGroup> = pad_groups
+            .iter()
+            .map(|group| {
+                let full_match = group.get(0).unwrap();
+                let pad_content = &group[1];
 
-            // Add the length of text between the last match and this one
-            if last_end < full_match.start() {
-                let between_text = &content[last_end..full_match.start()];
-                let stripped_between = strip_ansi_codes(between_text);
-                let between_width = stripped_between.graphemes(true).count();
-                occupied_space += between_width;
-            }
+                // Add space for text between matches
+                if last_end < full_match.start() {
+                    let between_text = &content[last_end..full_match.start()];
+                    let stripped_between = strip_ansi_codes(between_text);
+                    occupied_space += stripped_between.graphemes(true).count();
+                }
 
-            // Count graphemes in the padding content
-            let stripped_pad = strip_ansi_codes(pad_content);
-            let content_width = stripped_pad.graphemes(true).count();
-            occupied_space += content_width;
+                // Count graphemes in padding content
+                let stripped_pad = strip_ansi_codes(pad_content);
+                let width = stripped_pad.graphemes(true).count();
+                occupied_space += width;
 
-            let matched_group = MatchedGroup {
-                content: pad_content.to_string(),
-                start: full_match.start(),
-                end: full_match.end(),
-                grapheme_count: content_width,
-            };
+                // Update last_end for next iteration
+                last_end = full_match.end();
 
-            if !matched_group.content.is_empty() {
-                non_empty_groups += 1;
-            }
+                MatchedGroup {
+                    content: pad_content.to_string(),
+                    start: full_match.start(),
+                    end: full_match.end(),
+                    width,
+                }
+            })
+            .collect();
 
-            padding_groups.push(matched_group);
-
-            // Update last_end for the next iteration
-            last_end = full_match.end();
-        }
-
-        // Add the length of any remaining text after the last match
+        // Add space for remaining text
         if last_end < content.len() {
             let remaining_text = &content[last_end..];
             let stripped_remaining = strip_ansi_codes(remaining_text);
-            let remaining_width = stripped_remaining.graphemes(true).count();
-            occupied_space += remaining_width;
+            occupied_space += stripped_remaining.graphemes(true).count();
         }
+
+        let non_empty_groups = padding_groups
+            .iter()
+            .filter(|g| !g.content.is_empty())
+            .count();
 
         (padding_groups, occupied_space, non_empty_groups)
     }
