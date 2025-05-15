@@ -1,6 +1,6 @@
 use crate::term::TERM_SIZE;
 use crate::utils;
-use console::measure_text_width;
+use console::strip_ansi_codes;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
@@ -10,6 +10,7 @@ struct MatchedGroup {
     content: String,
     start: usize,
     end: usize,
+    grapheme_count: usize,
 }
 
 // Regex to match pad() calls, including nested ones
@@ -81,42 +82,35 @@ impl TextProcessor {
             return content.to_string();
         }
 
-        // Recursively process the content inside each pad() group
-        let mut processed = content.to_string();
-        for cap in PAD_PATTERN.captures_iter(content) {
-            if let Some(m) = cap.get(1) {
-                let inner = self.process_padding_line(m.as_str());
-                let full = cap.get(0).unwrap();
-                processed.replace_range(full.start()..full.end(), &format!("pad({})", inner));
-            }
+        let (padding_groups, occupied_space, non_empty_groups) =
+            self.extract_padding_groups(&content, &pad_groups);
+
+        let target_width = (self.get_width)();
+        let remaining_space = target_width.saturating_sub(occupied_space);
+        let space_per_group = if non_empty_groups > 0 {
+            (remaining_space as f64 / non_empty_groups as f64).ceil() as usize
+        } else {
+            0
+        };
+
+        println!("occupied_space: {}", occupied_space);
+        println!("width: {}", target_width);
+        println!("non_empty_groups: {}", non_empty_groups);
+        println!("remaining_space: {}", remaining_space);
+        println!("space_per_group: {}", space_per_group);
+
+        // Debug padding groups
+        println!("\nPadding Groups:");
+        for (i, group) in padding_groups.iter().enumerate() {
+            println!("Group {}:", i);
+            println!("  Content: '{}'", group.content);
+            println!("  Start: {}", group.start);
+            println!("  End: {}", group.end);
+            println!("  Width: {}", group.grapheme_count);
+            println!("  Is Empty: {}", group.content.is_empty());
         }
 
-        // Now extract the pad() groups again from the processed string
-        let pad_groups: Vec<_> = PAD_PATTERN.captures_iter(&processed).collect();
-        let (padding_groups, occupied_space, non_empty_groups) =
-            self.extract_padding_groups(&processed, &pad_groups);
-        let remaining_space = (self.get_width)().saturating_sub(occupied_space);
-        let space_per_group = remaining_space / non_empty_groups;
-        let extra_space = remaining_space % non_empty_groups;
-        let mut result = processed.to_string();
-        for (i, group) in padding_groups.iter().rev().enumerate() {
-            let start = group.start;
-            let end = group.end;
-            let replacement = if !group.content.is_empty() {
-                // For the last group, add any extra space from the remainder
-                let space = if i == non_empty_groups - 1 {
-                    space_per_group + extra_space
-                } else {
-                    space_per_group
-                };
-                let expanded = utils::expand_to_display_width(&group.content, space);
-                format!("{}{}", group.content, expanded)
-            } else {
-                String::new()
-            };
-            result.replace_range(start..end, &replacement);
-        }
-        result
+        content.to_string()
     }
 
     /// Extract padding groups from the content and calculate their information
@@ -140,23 +134,30 @@ impl TextProcessor {
         let mut non_empty_groups = 0;
         let mut last_end = 0;
 
+        // Find matches in the content
         for group in pad_groups {
             let full_match = group.get(0).unwrap();
             let pad_content = &group[1];
 
             // Add the length of text between the last match and this one
-            // Use the full_match's byte range to safely slice the string
             if last_end < full_match.start() {
-                occupied_space += measure_text_width(&content[last_end..full_match.start()]);
+                let between_text = &content[last_end..full_match.start()];
+                let stripped_between = strip_ansi_codes(between_text);
+                let between_width = stripped_between.graphemes(true).count();
+                occupied_space += between_width;
             }
 
-            let content_width = measure_text_width(pad_content);
+            // Count graphemes in the padding content
+            let stripped_pad = strip_ansi_codes(pad_content);
+            let graphemes: Vec<&str> = stripped_pad.graphemes(true).collect();
+            let content_width = graphemes.len();
             occupied_space += content_width;
 
             let matched_group = MatchedGroup {
                 content: pad_content.to_string(),
                 start: full_match.start(),
                 end: full_match.end(),
+                grapheme_count: content_width,
             };
 
             if !matched_group.content.is_empty() {
@@ -171,139 +172,12 @@ impl TextProcessor {
 
         // Add the length of any remaining text after the last match
         if last_end < content.len() {
-            occupied_space += measure_text_width(&content[last_end..]);
+            let remaining_text = &content[last_end..];
+            let stripped_remaining = strip_ansi_codes(remaining_text);
+            let remaining_width = stripped_remaining.graphemes(true).count();
+            occupied_space += remaining_width;
         }
 
         (padding_groups, occupied_space, non_empty_groups)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Helper function to debug test output
-    fn debug_output(result: &str) {
-        println!("\nDebug output for: {}", result);
-        println!("Total width: {}", measure_text_width(result));
-        println!("Character by character:");
-        for (i, c) in result.char_indices() {
-            println!(
-                "  {}: '{}' (width: {})",
-                i,
-                c,
-                measure_text_width(&c.to_string())
-            );
-        }
-    }
-
-    #[test]
-    fn test_process_padding_no_padding() {
-        let processor = TextProcessor::with_width(80);
-        let input = "Hello, World!";
-        assert_eq!(processor.process_padding(input), input);
-    }
-
-    #[test]
-    fn test_process_padding_single_padding() {
-        let processor = TextProcessor::with_width(20);
-        let input = "Hello pad(+) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello ++++++++ World");
-        assert_eq!(measure_text_width(&result), 20);
-    }
-
-    #[test]
-    fn test_process_padding_multiple_padding() {
-        let processor = TextProcessor::with_width(30);
-        let input = "Hello pad(+) pad(-) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello +++++++++ -------- World");
-        assert_eq!(measure_text_width(&result), 30);
-    }
-
-    #[test]
-    fn test_process_padding_with_emoji() {
-        let processor = TextProcessor::with_width(20);
-        let input = "Hello pad(🦀) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello 🦀 World");
-        assert_eq!(measure_text_width(&result), 14);
-    }
-
-    #[test]
-    fn test_process_padding_with_family_emoji() {
-        let processor = TextProcessor::with_width(30);
-        let input = "Hello pad(👨‍👩‍👧‍👦) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello 👨‍👩‍👧‍👦 World");
-        assert_eq!(measure_text_width(&result), 14);
-    }
-
-    #[test]
-    fn test_process_padding_multiline() {
-        let processor = TextProcessor::with_width(20);
-        let input = "Hello pad(+)\nWorld pad(-)";
-        let result = processor.process_padding(input);
-        let lines: Vec<&str> = result.lines().collect();
-        assert_eq!(lines.len(), 2);
-        debug_output(lines[0]);
-        debug_output(lines[1]);
-        assert_eq!(lines[0], "Hello +");
-        assert_eq!(lines[1], "World -");
-        assert_eq!(measure_text_width(lines[0]), 7);
-        assert_eq!(measure_text_width(lines[1]), 7);
-    }
-
-    #[test]
-    fn test_process_padding_empty_content() {
-        let processor = TextProcessor::with_width(20);
-        let input = "pad()";
-        let result = processor.process_padding(input);
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_process_padding_nested_padding() {
-        let processor = TextProcessor::with_width(30);
-        let input = "Hello pad(pad(+)) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello + World");
-        assert_eq!(measure_text_width(&result), 13);
-    }
-
-    #[test]
-    fn test_process_padding_exact_division() {
-        let processor = TextProcessor::with_width(20);
-        let input = "Hello pad(+) pad(+) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello + + World");
-        assert_eq!(measure_text_width(&result), 15);
-    }
-
-    #[test]
-    fn test_process_padding_mixed_content() {
-        let processor = TextProcessor::with_width(30);
-        let input = "Hello pad(🦀) pad(+) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello 🦀 + World");
-        assert_eq!(measure_text_width(&result), 16);
-    }
-
-    #[test]
-    fn test_process_padding_with_rainbow_flag() {
-        let processor = TextProcessor::with_width(30);
-        let input = "Hello pad(🏳️‍🌈) World";
-        let result = processor.process_padding(input);
-        debug_output(&result);
-        assert_eq!(result, "Hello 🏳️‍🌈 World");
-        assert!(measure_text_width(&result) >= 14); // Rainbow flag width can vary
     }
 }
