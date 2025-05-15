@@ -149,8 +149,7 @@ impl TextProcessor {
 
             // Count graphemes in the padding content
             let stripped_pad = strip_ansi_codes(pad_content);
-            let graphemes: Vec<&str> = stripped_pad.graphemes(true).collect();
-            let content_width = graphemes.len();
+            let content_width = stripped_pad.graphemes(true).count();
             occupied_space += content_width;
 
             let matched_group = MatchedGroup {
