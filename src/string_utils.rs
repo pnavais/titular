@@ -105,52 +105,79 @@ impl Truncate for String {
         // Find the position where we need to cut the text
         let mut current_width = 0;
         let mut result = String::new();
-        let mut i = 0;
+        let mut current_pos = 0;
 
-        while i < self.len() {
+        while current_pos < self.len() {
             // Check if we're in an ANSI sequence
-            if self[i..].starts_with("\x1b[") {
-                if let Some(end) = self[i..].find('m') {
+            if self[current_pos..].starts_with("\x1b[") {
+                if let Some(end) = self[current_pos..].find('m') {
                     // Only include ANSI codes that come before our truncation point
                     if current_width < width {
-                        let ansi_seq = &self[i..i + end + 1];
+                        let ansi_seq = &self[current_pos..current_pos + end + 1];
                         result.push_str(ansi_seq);
                     }
-                    i += end + 1;
+                    current_pos += end + 1;
                     continue;
                 }
             }
 
             // Process regular characters
-            if let Some(c) = self[i..].chars().next() {
+            if let Some(c) = self[current_pos..].chars().next() {
                 let char_width = measure_text_width(&c.to_string());
                 if current_width + char_width > width {
                     break;
                 }
                 current_width += char_width;
                 result.push(c);
-                i += c.len_utf8();
+                current_pos += c.len_utf8();
             } else {
                 break;
             }
         }
 
-        *self = process_ansi_escapes(&result, behavior);
+        *self = process_ansi_escapes(&result, self, current_pos, behavior);
     }
 }
 
 /// Process ANSI escape sequences according to the specified behavior
-fn process_ansi_escapes(s: &str, behavior: AnsiTruncateBehavior) -> String {
+fn process_ansi_escapes(
+    truncated: &str,
+    original: &str,
+    truncate_pos: usize,
+    behavior: AnsiTruncateBehavior,
+) -> String {
     match behavior {
-        AnsiTruncateBehavior::PreserveRemaining => s.to_string(),
+        AnsiTruncateBehavior::PreserveRemaining => {
+            let mut result = String::from(truncated);
+            let mut remaining_pos = truncate_pos;
+
+            // Collect all ANSI codes after truncation
+            while remaining_pos < original.len() {
+                if original[remaining_pos..].starts_with("\x1b[") {
+                    if let Some(end) = original[remaining_pos..].find('m') {
+                        let ansi_seq = &original[remaining_pos..remaining_pos + end + 1];
+                        result.push_str(ansi_seq);
+                        remaining_pos += end + 1;
+                        continue;
+                    }
+                }
+                // Move to next character boundary
+                if let Some(c) = original[remaining_pos..].chars().next() {
+                    remaining_pos += c.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            result
+        }
         AnsiTruncateBehavior::ResetAfter => {
-            if s.contains("\x1b[") {
-                format!("{}\x1b[0m", s.trim_end_matches("\x1b[0m"))
+            if truncated.contains("\x1b[") {
+                format!("{}\x1b[0m", truncated.trim_end_matches("\x1b[0m"))
             } else {
-                s.to_string()
+                truncated.to_string()
             }
         }
-        AnsiTruncateBehavior::NoModification => s.to_string(),
+        AnsiTruncateBehavior::NoModification => truncated.to_string(),
     }
 }
 
@@ -225,39 +252,32 @@ mod tests {
         // Test truncation with ANSI colors
         let mut s = String::from("\x1b[31mHello\x1b[0m World");
         s.truncate_ansi(5);
-        println!("Test 2: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello");
 
         // Test truncation with emojis
         let mut s = String::from("Hello 🦀 World");
         s.truncate_ansi(8);
-        println!("Test 3: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello 🦀");
         let mut s = String::from("Hello 🦀 World");
         s.truncate_ansi(7);
-        println!("Test 4: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello ");
 
         // Test truncation with ANSI and emojis
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
         s.truncate_ansi(8);
-        println!("Test 5: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello 🦀");
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
         s.truncate_ansi(7);
-        println!("Test 6: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello ");
 
         // Test truncation with no change needed
         let mut s = String::from("Hello");
         s.truncate_ansi(10);
-        println!("Test 7: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello");
 
         // Test truncation to zero
         let mut s = String::from("Hello");
         s.truncate_ansi(0);
-        println!("Test 8: {}|{}\n------------", s, s.len());
         assert_eq!(s, "");
     }
 
@@ -266,85 +286,50 @@ mod tests {
         // Test basic ASCII truncation
         let mut s = String::from("Hello World");
         s.truncate_ansi_with(5, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 1: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello");
 
         // Test truncation with ANSI colors
         let mut s = String::from("\x1b[31mHello\x1b[0m World");
         s.truncate_ansi_with(5, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 2: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello\x1b[0m");
 
         // Test truncation with emojis
         let mut s = String::from("Hello 🦀 World");
         s.truncate_ansi_with(8, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 3: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello 🦀");
         let mut s = String::from("Hello 🦀 World");
         s.truncate_ansi_with(7, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 4: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello ");
 
         // Test truncation with ANSI and emojis
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
         s.truncate_ansi_with(8, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 5: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello 🦀\x1b[0m");
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
         s.truncate_ansi_with(7, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 6: {}|{}\n------------", s, s.len());
         assert_eq!(s, "\x1b[31mHello \x1b[0m");
 
         // Test truncation with no change needed
         let mut s = String::from("Hello");
         s.truncate_ansi_with(10, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 7: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello");
 
         // Test truncation to zero
         let mut s = String::from("Hello");
         s.truncate_ansi_with(0, AnsiTruncateBehavior::ResetAfter);
-        println!("Test 8: {}|{}\n------------", s, s.len());
         assert_eq!(s, "");
     }
 
-    // #[test]
-    // fn test_truncate_ansi_with() {
-    //     // Test PreserveRemaining behavior
-    //     let mut s = String::from("\x1b[31mRed\x1b[32mGreen\x1b[34mBlue");
-    //     s.truncate_ansi_with(5, AnsiTruncateBehavior::PreserveRemaining);
-    //     assert_eq!(s, "\x1b[31mRed\x1b[32mGr\x1b[34m");
+    #[test]
+    fn test_truncate_ansi_with_preserve_remaining() {
+        // Test with multiple ANSI codes
+        let mut s = String::from("\x1b[31mHello 🦀\x1b[32m World\x1b[0m");
+        s.truncate_ansi_with(7, AnsiTruncateBehavior::PreserveRemaining);
+        assert_eq!(s, "\x1b[31mHello \x1b[32m\x1b[0m");
 
-    //     // Test ResetAfter behavior
-    //     let mut s = String::from("\x1b[31mRed\x1b[32mGreen\x1b[34mBlue");
-    //     s.truncate_ansi_with(5, AnsiTruncateBehavior::ResetAfter);
-    //     assert_eq!(s, "\x1b[31mRed\x1b[32mGr\x1b[0m");
-
-    //     // Test NoModification behavior
-    //     let mut s = String::from("\x1b[31mRed\x1b[32mGreen\x1b[34mBlue");
-    //     s.truncate_ansi_with(5, AnsiTruncateBehavior::NoModification);
-    //     assert_eq!(s, "\x1b[31mRed\x1b[32mGr");
-
-    //     // Test with emojis and ANSI
-    //     let mut s = String::from("\x1b[31mHello 🦀\x1b[32mWorld");
-    //     s.truncate_ansi_with(8, AnsiTruncateBehavior::ResetAfter);
-    //     assert_eq!(s, "\x1b[31mHello 🦀\x1b[0m");
-    //     let mut s = String::from("\x1b[31mHello 🦀\x1b[32mWorld");
-    //     s.truncate_ansi_with(7, AnsiTruncateBehavior::ResetAfter);
-    //     assert_eq!(s, "\x1b[31mHello \x1b[0m");
-
-    //     // Test with multiple ANSI codes and ResetAfter
-    //     let mut s = String::from("\x1b[1m\x1b[31mBold Red\x1b[32mGreen");
-    //     s.truncate_ansi_with(5, AnsiTruncateBehavior::ResetAfter);
-    //     assert_eq!(s, "\x1b[1m\x1b[31mBold \x1b[0m");
-    // }
-
-    //     #[test]
-    //     fn debug_truncate_ansi_with() {
-    //         let mut s = String::from("\x1b[31mHello 🦀\x1b[32mWorld");
-    //         println!("Initial string: {}", s);
-    //         s.truncate_ansi_with(8, AnsiTruncateBehavior::ResetAfter);
-    //         println!("Final string: {}", s);
-    //         assert_eq!(s, "\x1b[31mHello 🦀\x1b[0m");
-    //     }
+        // Test with nested ANSI codes
+        let mut s = String::from("\x1b[1m\x1b[31mBold Red\x1b[32mGreen\x1b[0m");
+        s.truncate_ansi_with(5, AnsiTruncateBehavior::PreserveRemaining);
+        assert_eq!(s, "\x1b[1m\x1b[31mBold \x1b[32m\x1b[0m");
+    }
 }
