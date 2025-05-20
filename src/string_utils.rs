@@ -84,30 +84,34 @@ impl Truncate for String {
 
         // Find the position where we need to cut the text
         let mut current_width = 0;
-        let mut last_ansi_end = 0;
         let mut result = String::new();
+        let mut i = 0;
 
-        // Process the text character by character
-        for (i, c) in self.char_indices() {
+        while i < self.len() {
             // Check if we're in an ANSI sequence
             if self[i..].starts_with("\x1b[") {
-                // Find the end of the ANSI sequence
                 if let Some(end) = self[i..].find('m') {
-                    let ansi_seq = &self[i..i + end + 1];
-                    result.push_str(ansi_seq);
-                    last_ansi_end = i + end + 1;
+                    // Only include ANSI codes that come before our truncation point
+                    if current_width < width {
+                        let ansi_seq = &self[i..i + end + 1];
+                        result.push_str(ansi_seq);
+                    }
+                    i += end + 1;
                     continue;
                 }
             }
 
-            // Only count width for non-ANSI characters
-            if i >= last_ansi_end {
+            // Process regular characters
+            if let Some(c) = self[i..].chars().next() {
                 let char_width = measure_text_width(&c.to_string());
-                if current_width + char_width > width as usize {
+                if current_width + char_width > width {
                     break;
                 }
                 current_width += char_width;
                 result.push(c);
+                i += c.len_utf8();
+            } else {
+                break;
             }
         }
 
@@ -197,7 +201,7 @@ mod tests {
         let mut s = String::from("Hello 🦀 World");
         s.truncate_ansi(7);
         println!("Test 4: {}|{}\n------------", s, s.len());
-        assert_eq!(s, "\x1b[31mHello ");
+        assert_eq!(s, "Hello ");
 
         // Test truncation with ANSI and emojis
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
@@ -207,7 +211,7 @@ mod tests {
         let mut s = String::from("\x1b[31mHello 🦀\x1b[0m World");
         s.truncate_ansi(7);
         println!("Test 6: {}|{}\n------------", s, s.len());
-        assert_eq!(s, "\x1b[31mHello");
+        assert_eq!(s, "\x1b[31mHello ");
 
         // Test truncation with no change needed
         let mut s = String::from("Hello");
