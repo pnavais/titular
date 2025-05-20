@@ -12,16 +12,23 @@ use crate::{
 };
 
 pub const DEFAULT_TEMPLATE: &str = "[details]\n\
-                                name    = \"@name\"\n\
+                                name    = \"Basic\"\n\
                                 version = \"1.0\"\n\
-                                author  = \"@author\"\n\
-                                url     = \"@url\"\n\n\
+                                author  = \"pnavais\"\n\
+                                url     = \"https://github.com/pnavais\"\n\n\
                                 [vars]\n\
-                                f  = \"*\"\n\
-                                my_var = \"Hello\"\n\
-                                my_color = \"green\"\n\n\
+                                main_color = \"green\"\n\
+                                message_color = \"$main_color\"\n\
+                                white=\"RGB(255,255,255)\"\n\
+                                f=\"*\"\n\
+                                fb=\"$f\"\n\
+                                fe=\"${f2:f}\"\n\n\
                                 [pattern]\n\
-                                data = \"${f:fg[$cl]:pad}${my_var:fg[$my_color]+[ ]}${m:fg[$my_color]}${f:fg[$cr]:pad}\"\n";
+                                data = \"\"\"\\\n\
+                                {% filter style(fg_color=main_color) %}\\\n\
+                                      pad({{fb}}){{m | color(name=message_color)}}pad({{fe | color(name=main_color)}})\\\n\
+                                {% endfilter %}\\\n\
+                                \"\"\"\n";
 
 pub struct TemplateWriter {}
 
