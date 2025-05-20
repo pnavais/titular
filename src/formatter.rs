@@ -96,7 +96,7 @@ impl TemplateFormatter {
             })?;
 
         Ok(format!(
-            "{}|",
+            "{}",
             TextProcessor::default().process_padding(&template)
         ))
     }

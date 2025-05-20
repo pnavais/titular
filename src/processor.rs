@@ -1,4 +1,4 @@
-use crate::string_utils::{expand_to_width, Truncate};
+use crate::string_utils::{expand_to_width, AnsiTruncateBehavior, Truncate};
 use crate::term::TERM_SIZE;
 use console::strip_ansi_codes;
 use once_cell::sync::Lazy;
@@ -100,7 +100,7 @@ impl TextProcessor {
             );
         });
 
-        result.truncate_ansi(target_width);
+        result.truncate_ansi_with(target_width, AnsiTruncateBehavior::ResetAfter);
         result
     }
 
