@@ -1,3 +1,4 @@
+use crate::string_utils::{expand_to_width, Truncate};
 use crate::term::TERM_SIZE;
 use console::strip_ansi_codes;
 use once_cell::sync::Lazy;
@@ -9,7 +10,6 @@ struct MatchedGroup {
     content: String,
     start: usize,
     end: usize,
-    width: usize,
 }
 
 // Regex to match pad() calls, including nested ones
@@ -73,32 +73,34 @@ impl TextProcessor {
     /// # Returns
     /// A string with the processed content
     fn process_padding_line(&self, content: &str) -> String {
-        // Find all pad() groups
         let pad_groups: Vec<_> = PAD_PATTERN.captures_iter(content).collect();
-
-        // If no padding groups, return the content as is
         if pad_groups.is_empty() {
             return content.to_string();
         }
 
         let (padding_groups, occupied_space, non_empty_groups) =
-            self.extract_padding_groups(&content, &pad_groups);
-
+            self.extract_padding_groups(content, &pad_groups);
         let target_width = (self.get_width)();
-        let remaining_space = target_width.saturating_sub(occupied_space);
         let space_per_group = if non_empty_groups > 0 {
-            (remaining_space as f64 / non_empty_groups as f64).ceil() as usize
+            (target_width.saturating_sub(occupied_space) as f64 / non_empty_groups as f64).ceil()
+                as usize
         } else {
             0
         };
 
         let mut result = content.to_string();
-        for group in padding_groups.iter().rev() {
-            let start = group.start;
-            let end = group.end;
-            result.replace_range(start..end, &group.content);
-        }
+        padding_groups.iter().rev().for_each(|group| {
+            result.replace_range(
+                group.start..group.end,
+                &format!(
+                    "{}{}",
+                    group.content,
+                    expand_to_width(&group.content, space_per_group)
+                ),
+            );
+        });
 
+        result.truncate_ansi(target_width);
         result
     }
 
@@ -136,8 +138,7 @@ impl TextProcessor {
 
                 // Count graphemes in padding content
                 let stripped_pad = strip_ansi_codes(pad_content);
-                let width = stripped_pad.graphemes(true).count();
-                occupied_space += width;
+                occupied_space += stripped_pad.graphemes(true).count();
 
                 // Update last_end for next iteration
                 last_end = full_match.end();
@@ -146,7 +147,6 @@ impl TextProcessor {
                     content: pad_content.to_string(),
                     start: full_match.start(),
                     end: full_match.end(),
-                    width,
                 }
             })
             .collect();

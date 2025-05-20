@@ -1,67 +1,10 @@
 use crate::error::*;
 use nu_ansi_term::Color::{Blue, Yellow};
-use print_positions::print_positions;
 use std::path::PathBuf;
 use std::process::Command;
+
 pub const ROOT_PREFIX: &str = "\u{f115}";
 pub const ELEMENT_PREFIX: &str = "\u{ea7b}";
-
-/// Expands a string to a target width by repeating its content.
-/// The width is calculated based on graphemes (print positions), ignoring ANSI codes
-/// and non-displayable characters.
-///
-/// # Arguments
-///
-/// * `input` - The input string to expand
-/// * `target_width` - The target width in graphemes
-///
-/// # Returns
-///
-/// A string expanded to the target width
-///
-/// # Examples
-///
-/// ```
-/// use titular::utils::expand_to_width;
-///
-/// assert_eq!(expand_to_width("X", 2), "XX");
-/// assert_eq!(expand_to_width("XY", 3), "XYX");
-/// assert_eq!(expand_to_width("🦀", 2), "🦀🦀");
-/// assert_eq!(expand_to_width("🦀🌟", 3), "🦀🌟🦀");
-/// ```
-pub fn expand_to_width(input: &str, target_width: usize) -> String {
-    // Collect the "print positions" (user-visible glyphs, including ANSI)
-    let positions: Vec<&str> = print_positions(input)
-        .map(|(start, end)| &input[start..end])
-        .collect();
-
-    // If input is empty or has no visible positions, return as is
-    if positions.is_empty() {
-        return input.to_string();
-    }
-
-    // Calculate current visible width
-    let current_width = positions.len();
-
-    // If target_width is 0 or less than or equal to current width, return input as-is
-    if target_width == 0 || current_width >= target_width {
-        return input.to_string();
-    }
-
-    // Repeat positions to build up to target width
-    let mut result = String::new();
-    let mut i = 0;
-    while i < target_width {
-        for pos in &positions {
-            if i >= target_width {
-                break;
-            }
-            result.push_str(pos);
-            i += 1;
-        }
-    }
-    result
-}
 
 /// Formats bytes into a human-readable string (KB, MB, etc.)
 ///
@@ -469,61 +412,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_expand_to_width() {
-        // Test basic ASCII characters
-        assert_eq!(expand_to_width("X", 0), "X");
-        assert_eq!(expand_to_width("X", 1), "X");
-        assert_eq!(expand_to_width("X", 2), "XX");
-        assert_eq!(expand_to_width("X", 3), "XXX");
-
-        // Test multi-character strings
-        assert_eq!(expand_to_width("XY", 0), "XY");
-        assert_eq!(expand_to_width("XY", 1), "XY");
-        assert_eq!(expand_to_width("XY", 2), "XY");
-        assert_eq!(expand_to_width("XY", 3), "XYX");
-        assert_eq!(expand_to_width("XY", 4), "XYXY");
-
-        // Test emojis
-        assert_eq!(expand_to_width("🦀", 0), "🦀");
-        assert_eq!(expand_to_width("🦀", 1), "🦀");
-        assert_eq!(expand_to_width("🦀", 2), "🦀🦀");
-        assert_eq!(expand_to_width("🦀🦀", 2), "🦀🦀");
-        assert_eq!(expand_to_width("🦀🌟", 3), "🦀🌟🦀");
-        assert_eq!(expand_to_width("🦀🌟", 4), "🦀🌟🦀🌟");
-
-        // Test Mixed characters
-        assert_eq!(expand_to_width("🦀-🦀é", 8), "🦀-🦀é🦀-🦀é");
-
-        // Test Unicode characters
-        assert_eq!(expand_to_width("é", 0), "é");
-        assert_eq!(expand_to_width("é", 1), "é");
-        assert_eq!(expand_to_width("é", 2), "éé");
-        assert_eq!(expand_to_width("éè", 3), "éèé");
-        assert_eq!(expand_to_width("éè", 4), "éèéè");
-
-        // Test Japanese characters
-        assert_eq!(expand_to_width("こ", 0), "こ");
-        assert_eq!(expand_to_width("こ", 1), "こ");
-        assert_eq!(expand_to_width("こ", 2), "ここ");
-        assert_eq!(expand_to_width("こ", 3), "こここ");
-        assert_eq!(expand_to_width("こに", 4), "こにこに");
-
-        // Test Korean characters
-        assert_eq!(expand_to_width("안녕", 0), "안녕");
-        assert_eq!(expand_to_width("안녕", 1), "안녕");
-        assert_eq!(expand_to_width("안녕", 2), "안녕");
-        assert_eq!(expand_to_width("안녕", 3), "안녕안");
-        assert_eq!(expand_to_width("안녕", 4), "안녕안녕");
-
-        // Test ANSI escape codes
-        assert_eq!(expand_to_width("\x1b[31mH\x1b[0m", 0), "\x1b[31mH\x1b[0m");
-        assert_eq!(expand_to_width("\x1b[31mH\x1b[0m", 1), "\x1b[31mH\x1b[0m");
-        assert_eq!(
-            expand_to_width("\x1b[31mH\x1b[0m", 2),
-            "\x1b[31mH\x1b[0m\x1b[31mH\x1b[0m"
-        );
     }
 }

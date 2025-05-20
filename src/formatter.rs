@@ -4,12 +4,12 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use tera::Tera;
 
-use crate::color_filter;
 use crate::config::TemplateConfig;
 use crate::context::Context;
 use crate::error::*;
+use crate::filters::color;
+use crate::filters::style;
 use crate::processor::TextProcessor;
-use crate::style_filter;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
 
@@ -75,30 +75,29 @@ impl TemplateFormatter {
         // Register filters
         tera.register_filter(
             "color",
-            color_filter::create_color_filter(Arc::clone(&self.context)),
+            color::create_color_filter(Arc::clone(&self.context)),
         );
         tera.register_filter(
             "style",
-            style_filter::create_style_filter(Arc::clone(&self.context)),
+            style::create_style_filter(Arc::clone(&self.context)),
         );
 
         tera.add_raw_template(&template_name, &pattern)?;
         let template = tera
             .render(&template_name, &self.context.get_data())
-            .map_err(|e| {
+            .map_err(|e: tera::Error| {
                 println!("Error: {:?}", e);
                 let mut error_msg = e.to_string();
-                let mut current = e.source();
-                while let Some(source) = current {
+                if let Some(source) = e.source() {
                     error_msg.push_str("\nCaused by: ");
                     error_msg.push_str(&source.to_string());
-                    current = source.source();
                 }
                 Error::TemplateRenderError(error_msg)
             })?;
 
-        // Process padding in the rendered template
-        let processor = TextProcessor::default();
-        Ok(processor.process_padding(&template))
+        Ok(format!(
+            "{}|",
+            TextProcessor::default().process_padding(&template)
+        ))
     }
 }

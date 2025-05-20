@@ -14,7 +14,7 @@ fn run() -> Result<bool> {
     app.start()
 }
 
-fn main() {
+fn main() -> Result<()> {
     let result = run();
 
     match result {

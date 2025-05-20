@@ -19,5 +19,5 @@ release:
   cargo build --release
 reset:
   rm -fr $HOME/.config/titular
-test:
-  cargo test
+test *args:
+  cargo test {{args}}
