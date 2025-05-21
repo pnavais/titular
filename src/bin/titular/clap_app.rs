@@ -54,6 +54,15 @@ pub fn build_app(interactive_output: bool) -> Command {
         ),
     )
     .arg(
+        arg!(-c --color <VALUE> ... "Specifies the color to use in the pattern.")
+        .long_help(
+            "Explicitly specify the color to use in the pattern. \
+                    If not specified, the default color specified in the pattern will be used. \
+                    When specifying multiple color options, \
+                    the latter will be assigned following the same occurrence order (c2, c3, ...).",
+        ),
+    )
+    .arg(
         arg!(-s --set <VALUE> ... "Sets the value of a variable (key=value).")
         .long_help(
             "Specifies the value of a given variable used in the pattern by supplying \
@@ -78,7 +87,7 @@ pub fn build_app(interactive_output: bool) -> Command {
         arg!(--hide "Hide all items flagged as invisible in the pattern.")
         .long_help("Prevents writing the items flagged as invisible but taking into account their width for padding purposes.")
     ).arg(
-        arg!(-c --clear "Clears the current line and moves the cursor at the beginning.")
+        arg!(--clear "Clears the current line and moves the cursor at the beginning.")
         .long_help("Erases the entire line the cursor is currently on then moves the cursor to the beginning of the line.")
     );
 

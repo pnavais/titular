@@ -59,6 +59,16 @@ impl App {
                     .collect(),
             );
         }
+        if self.matches.contains_id("color") {
+            context.insert_multi(
+                "c",
+                self.matches
+                    .get_many::<String>("color")
+                    .unwrap()
+                    .map(|s| s.as_str())
+                    .collect(),
+            );
+        }
         if self.matches.contains_id("set") {
             for v in self
                 .matches

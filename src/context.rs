@@ -1,13 +1,19 @@
 use crate::error::{Error, Result};
 use serde::Serialize;
 use serde_json::value::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use tera::Context as TeraContext;
 
 #[derive(Debug)]
 pub enum Modifier {
     INV,
     NONE,
+}
+
+#[derive(Debug)]
+pub struct MissingVar {
+    pub key: &'static str,
+    pub var: String,
 }
 
 #[derive(Debug, Default)]
@@ -26,7 +32,7 @@ impl Context {
     }
 
     /// Resolves a variable reference in the format $var or ${var:default_value}
-    fn resolve_variable(&self, value: &str, visited: &mut HashMap<String, bool>) -> Result<String> {
+    fn resolve_variable(&self, value: &str, visited: &mut HashSet<String>) -> Result<String> {
         // Check if the value is a variable reference
         if !value.starts_with('$') {
             return Ok(value.to_string());
@@ -46,12 +52,12 @@ impl Context {
         };
 
         // Check for cycles
-        if visited.contains_key(var_name) {
+        if visited.contains(var_name) {
             return Err(Error::ContextCyclicReference(var_name.to_string()));
         }
 
         // Mark as visited
-        visited.insert(var_name.to_string(), true);
+        visited.insert(var_name.to_string());
 
         // Get the value from context
         let resolved = match self.get(var_name) {
@@ -81,6 +87,26 @@ impl Context {
         &self.data
     }
 
+    /// Attempts to resolve a list of previously failed variables
+    ///
+    /// # Arguments
+    /// * `missing_vars` - Vector of missing variables with their associated keys
+    fn resolve_missing_vars(&mut self, _missing_vars: Vec<MissingVar>) {
+        // Intentionally left empty for now
+        for missing in _missing_vars {
+            let value = match self.resolve_variable(&missing.var, &mut HashSet::new()) {
+                Ok(resolved) => Value::String(resolved),
+                Err(_) => Value::String(if missing.var.starts_with('$') {
+                    String::new()
+                } else {
+                    missing.var
+                }),
+            };
+            self.data.insert(missing.key, &value);
+            self.keys.insert(missing.key);
+        }
+    }
+
     pub fn from<I, K, V>(context: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -88,10 +114,14 @@ impl Context {
         V: Serialize + std::fmt::Display,
     {
         let mut context_map = Context::new();
+        let mut missing_vars = Vec::new();
         for (key, value) in context {
             let key_str = key.into();
-            context_map.insert(key_str, &value);
+            if let Some(missing) = context_map.insert(key_str, &value) {
+                missing_vars.push(missing);
+            }
         }
+        context_map.resolve_missing_vars(missing_vars);
         context_map
     }
 
@@ -105,9 +135,13 @@ impl Context {
         K: Into<String>,
         V: Serialize + std::fmt::Display,
     {
+        let mut missing_vars = Vec::new();
         for (key, value) in context {
-            self.insert(key, &value);
+            if let Some(missing) = self.insert(key, &value) {
+                missing_vars.push(missing);
+            }
         }
+        self.resolve_missing_vars(missing_vars);
     }
 
     /// Extends the context with the given context replacing existing keys.
@@ -120,11 +154,15 @@ impl Context {
         K: Into<String> + AsRef<str>,
         V: Serialize + std::fmt::Display,
     {
+        let mut missing_vars = Vec::new();
         for (key, value) in context {
             if !self.contains(key.as_ref()) {
-                self.insert(key, &value);
+                if let Some(missing) = self.insert(key, &value) {
+                    missing_vars.push(missing);
+                }
             }
         }
+        self.resolve_missing_vars(missing_vars);
     }
 
     /// Extends the context with the given context replacing existing keys.
@@ -132,11 +170,15 @@ impl Context {
     /// # Arguments
     /// * `context` - The context to extend the current context with.
     pub fn append_from(&mut self, context: &Context) {
+        let mut missing_vars = Vec::new();
         for key in &context.keys {
             if let Some(value) = context.get_raw(key) {
-                self.insert(*key, value);
+                if let Some(missing) = self.insert(*key, value) {
+                    missing_vars.push(missing);
+                }
             }
         }
+        self.resolve_missing_vars(missing_vars);
     }
 
     /// Inserts a value into the context
@@ -144,18 +186,30 @@ impl Context {
     /// # Arguments
     /// * `key` - The key to insert the value into.
     /// * `val` - The value to insert into the context.
+    ///
+    /// # Returns
+    /// Returns `Some(MissingVar)` if a variable resolution failed, or `None` if all resolutions succeeded
     pub fn insert<T: Serialize + std::fmt::Display + ?Sized, S: Into<String>>(
         &mut self,
         key: S,
         val: &T,
-    ) {
+    ) -> Option<MissingVar> {
+        let mut failed_value: Option<String> = None;
         let key_str = key.into();
         let value = match serde_json::to_value(val) {
             Ok(Value::String(s)) => {
                 // Try to resolve variable references
-                match self.resolve_variable(&s, &mut HashMap::new()) {
+                match self.resolve_variable(&s, &mut HashSet::new()) {
                     Ok(resolved) => Value::String(resolved),
-                    Err(_) => Value::String(if s.starts_with('$') { String::new() } else { s }),
+                    Err(_) => {
+                        let value = Value::String(if s.starts_with('$') {
+                            String::new()
+                        } else {
+                            s.clone()
+                        });
+                        failed_value = Some(s);
+                        value
+                    }
                 }
             }
             Ok(v) => v,
@@ -165,6 +219,7 @@ impl Context {
         let key_ref: &'static str = Box::leak(key_str.into_boxed_str());
         self.data.insert(key_ref, &value);
         self.keys.insert(key_ref);
+        failed_value.map(|var| MissingVar { key: key_ref, var })
     }
 
     /// Checks whether the context provides the given key
@@ -260,7 +315,7 @@ impl Context {
     pub fn insert_many(&mut self, key: &str, values: Vec<&str>) {
         let resolved_values: Vec<Value> = values
             .into_iter()
-            .map(|v| match self.resolve_variable(v, &mut HashMap::new()) {
+            .map(|v| match self.resolve_variable(v, &mut HashSet::new()) {
                 Ok(resolved) => Value::String(resolved),
                 Err(_) => Value::String(v.to_string()),
             })

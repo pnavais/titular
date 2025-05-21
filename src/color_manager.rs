@@ -1,6 +1,7 @@
 use nu_ansi_term::{Color, Color::*, Style};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::collections::HashSet;
 
 use crate::context::Context;
 
@@ -59,7 +60,6 @@ impl ColorManager {
                 style_obj = style_obj.on(c);
             }
         }
-
         style_obj.paint(txt).to_string()
     }
 
@@ -79,8 +79,35 @@ impl ColorManager {
     /// A color object
     ///
     fn get_style(colours: &Context, color_name: &str) -> Option<Color> {
-        let computed_color = colours.get(color_name).unwrap_or(color_name);
-        ColorManager::process_color(colours, computed_color)
+        ColorManager::resolve_color_safely(colours, color_name, &mut HashSet::new())
+    }
+
+    /// Internal method to process a color with cycle detection
+    ///
+    /// # Arguments
+    ///
+    /// * `colours` - A reference to the fallback map containing color configurations
+    /// * `color_name` - The name of the color to use
+    /// * `visited` - A set to track visited colors and detect cycles
+    ///
+    /// # Returns
+    ///
+    /// A color object if the color can be resolved, None if a cycle is detected or the color cannot be resolved
+    fn resolve_color_safely(
+        colours: &Context,
+        color_name: &str,
+        visited: &mut HashSet<String>,
+    ) -> Option<Color> {
+        // Check for cycles
+        if !visited.insert(color_name.to_string()) {
+            return None;
+        }
+
+        ColorManager::process_color(
+            colours,
+            colours.get(color_name).unwrap_or(color_name),
+            visited,
+        )
     }
 
     /// Process a color string into a Color object
@@ -93,7 +120,11 @@ impl ColorManager {
     /// # Returns
     ///
     /// A color object
-    fn process_color(colours: &Context, color_str: &str) -> Option<Color> {
+    fn process_color(
+        colours: &Context,
+        color_str: &str,
+        visited: &mut HashSet<String>,
+    ) -> Option<Color> {
         if RGB_REGEX.is_match(color_str) {
             let groups = RGB_REGEX.captures(color_str).unwrap();
             let r: u8 = groups.get(1).map_or("", |m| m.as_str()).parse().unwrap();
@@ -117,7 +148,7 @@ impl ColorManager {
                 None
             }
         } else {
-            ColorManager::get_style(colours, color_str)
+            ColorManager::resolve_color_safely(colours, color_str, visited)
         }
     }
 
