@@ -97,7 +97,7 @@ impl TemplateFormatter {
 
         Ok(format!(
             "{}",
-            TextProcessor::default().process_padding(&template)
+            TextProcessor::with_context(Arc::clone(&self.context)).process_padding(&template)
         ))
     }
 }

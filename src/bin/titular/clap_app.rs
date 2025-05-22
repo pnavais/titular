@@ -1,7 +1,8 @@
 use clap::{
     arg,
     builder::{styling::AnsiColor, Styles},
-    crate_description, crate_name, crate_version, Arg, ArgAction, ColorChoice, Command,
+    crate_description, crate_name, crate_version, value_parser, Arg, ArgAction, ColorChoice,
+    Command,
 };
 
 fn env_no_color() -> bool {
@@ -74,7 +75,9 @@ pub fn build_app(interactive_output: bool) -> Command {
         .long_help(
             "Explicitly specify the width percentage (%) of the maxium width \
                     of the terminal to use (defaults to 100%).",
-        ),
+        )
+        .value_parser(value_parser!(u8).range(0..=100))
+        .default_value("100"),
     )
     .arg(
         arg!(--"with-time" "Adds a trailing timestamp.")

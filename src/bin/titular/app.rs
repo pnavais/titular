@@ -91,9 +91,10 @@ impl App {
             context.insert(
                 "width",
                 self.matches
-                    .get_one::<String>("width")
-                    .map(|s| s.as_str())
-                    .unwrap(),
+                    .get_one::<u8>("width")
+                    .map(|w| w.to_string())
+                    .unwrap_or_default()
+                    .as_str(),
             );
         }
         if self.matches.contains_id("no-newline") {
