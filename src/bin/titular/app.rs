@@ -97,7 +97,7 @@ impl App {
                     .as_str(),
             );
         }
-        if self.matches.contains_id("no-newline") {
+        if self.matches.get_flag("no-newline") {
             context.insert("skip-newline", "true");
         }
         if self.matches.contains_id("with-time") {

@@ -376,7 +376,7 @@ impl<'a> TemplatesController<'a> {
         full_context.append(&self.config.vars);
 
         let formatted = TemplateFormatter::new(full_context).format(&template_payload)?;
-        writeln!(std::io::stdout(), "{}", formatted)?;
+        write!(std::io::stdout(), "{}", formatted)?;
         Ok(true)
     }
 

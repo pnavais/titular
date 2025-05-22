@@ -96,8 +96,13 @@ impl TemplateFormatter {
             })?;
 
         Ok(format!(
-            "{}",
-            TextProcessor::with_context(Arc::clone(&self.context)).process_padding(&template)
+            "{}{}",
+            TextProcessor::with_context(Arc::clone(&self.context)).process_padding(&template),
+            if self.context.is_active("skip-newline") {
+                ""
+            } else {
+                "\n"
+            }
         ))
     }
 }
