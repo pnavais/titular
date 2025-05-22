@@ -22,11 +22,14 @@ pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 white=\"RGB(255,255,255)\"\n\
                                 f=\"*\"\n\
                                 fb=\"$f\"\n\
-                                fe=\"${f2:f}\"\n\n\
+                                fe=\"${f2:f}\"\n\
+                                c=\"$main_color\"\n\
+                                c2=\"$message_color\"\n\
+                                c3=\"$main_color\"\n\n\
                                 [pattern]\n\
                                 data = \"\"\"\\\n\
-                                {% filter style(fg_color=main_color) %}\\\n\
-                                      pad({{fb}}){{m | color(name=message_color)}}pad({{fe | color(name=main_color)}})\\\n\
+                                {% filter style(fg_color=c) %}\\\n\
+                                      pad({{fb}}){{m | color(name=c2)}}pad({{fe | color(name=c3)}})\\\n\
                                 {% endfilter %}\\\n\
                                 \"\"\"\n";
 
