@@ -10,13 +10,13 @@ use serde::Serialize;
 use serde_json;
 
 use crate::error::*;
-
-pub const DEFAULT_TEMPLATE_EXT: &str = ".tl";
-pub const DEFAULT_TEMPLATE_NAME: &str = "basic";
-pub const DEFAULT_THEME: &str = "base16-ocean.dark";
-
+use crate::utils::safe_time_format;
 #[cfg(feature = "fetcher")]
-pub const DEFAULT_REMOTE_REPO: &str = "github:pnavais/titular/templates";
+use crate::DEFAULT_REMOTE_REPO;
+use crate::DEFAULT_TEMPLATE_NAME;
+#[cfg(feature = "display")]
+use crate::DEFAULT_THEME;
+use crate::DEFAULT_TIME_FORMAT;
 
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,7 +98,7 @@ impl Default for Defaults {
             width: "full".to_string(),
             surround_start: "[".to_string(),
             surround_end: "]".to_string(),
-            time_format: "%H:%M:%S".to_string(),
+            time_format: DEFAULT_TIME_FORMAT.to_string(),
             time_pattern: "${space}%{time:fg[tc]}".to_string(),
             display: Some(Display::Raw),
             #[cfg(feature = "display")]
@@ -137,7 +137,7 @@ impl MainConfig {
         // Add misc vars
         self.vars.insert(
             "time".to_owned(),
-            Local::now().format(&self.defaults.time_format).to_string(),
+            safe_time_format(&Local::now(), &self.defaults.time_format),
         );
     }
 }

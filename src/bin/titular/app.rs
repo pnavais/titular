@@ -76,9 +76,8 @@ impl App {
                 .unwrap()
                 .map(|s| s.as_str())
             {
-                let k: Vec<&str> = v.split('=').collect();
-                if k.len() > 1 {
-                    context.insert(k[0], k[1]);
+                if let Some((key, value)) = v.split_once('=') {
+                    context.insert(key, value);
                 } else {
                     return Err(Error::ArgsProcessingError(format!(
                         "Invalid set parameter supplied \"{}\" (Must be in key=value format)",
@@ -100,13 +99,13 @@ impl App {
         if self.matches.get_flag("no-newline") {
             context.insert("skip-newline", "true");
         }
-        if self.matches.contains_id("with-time") {
+        if self.matches.get_flag("with-time") {
             context.insert("with-time", "true");
         }
-        if self.matches.contains_id("hide") {
+        if self.matches.get_flag("hide") {
             context.insert("hide", "true");
         }
-        if self.matches.contains_id("clear") {
+        if self.matches.get_flag("clear") {
             context.insert("clear", "true");
         }
 

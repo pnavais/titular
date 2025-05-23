@@ -10,6 +10,8 @@ use std::str::FromStr;
 use crate::config::Display;
 use crate::context::Context;
 use crate::error::*;
+#[cfg(feature = "display")]
+use crate::DEFAULT_THEME;
 
 use pager::Pager;
 
@@ -20,8 +22,6 @@ use syntect::{
     util::{as_24_bit_terminal_escaped, LinesWithEndings},
 };
 
-#[cfg(feature = "display")]
-use crate::config::DEFAULT_THEME;
 #[cfg(feature = "display")]
 use crate::term::TERM_SIZE;
 #[cfg(feature = "display")]

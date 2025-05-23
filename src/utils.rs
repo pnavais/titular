@@ -1,4 +1,6 @@
 use crate::error::*;
+use crate::DEFAULT_TIME_FORMAT;
+use chrono::{DateTime, Local};
 use nu_ansi_term::Color::{Blue, Yellow};
 use num;
 use std::path::PathBuf;
@@ -6,6 +8,40 @@ use std::process::Command;
 
 pub const ROOT_PREFIX: &str = "\u{f115}";
 pub const ELEMENT_PREFIX: &str = "\u{ea7b}";
+
+/// Safely formats a DateTime using the provided format string.
+/// If the format string is invalid, returns a default format (%H:%M:%S).
+///
+/// # Arguments
+///
+/// * `dt` - The DateTime to format
+/// * `format` - The format string to use for time formatting
+///
+/// # Returns
+///
+/// A string containing the formatted time
+pub fn safe_time_format(dt: &DateTime<Local>, format: &str) -> String {
+    // Parse the format string first to validate it
+    let items: Vec<_> = chrono::format::strftime::StrftimeItems::new(format).collect();
+
+    // If any item is an error, use default format
+    if items
+        .iter()
+        .any(|item| matches!(item, chrono::format::Item::Error))
+    {
+        eprintln!(
+            "{}",
+            Yellow.paint(format!(
+                "WARNING: Invalid time format specified \"{}\"",
+                format
+            ))
+        );
+        return dt.format(DEFAULT_TIME_FORMAT).to_string();
+    }
+
+    // Use the validated format items
+    dt.format_with_items(items.into_iter()).to_string()
+}
 
 /// Formats bytes into a human-readable string (KB, MB, etc.)
 ///
@@ -503,5 +539,32 @@ mod tests {
         assert_eq!(safe_parse::<i16>("-32769"), -32768); // Clamped to i16::MIN
         assert_eq!(safe_parse::<i16>("32768"), 32767); // Clamped to i16::MAX
         assert_eq!(safe_parse::<i16>("abc"), 0); // Non-numeric returns 0
+    }
+
+    #[test]
+    fn test_safe_time_format() {
+        let now = Local::now();
+        let default_format = safe_time_format(&now, DEFAULT_TIME_FORMAT);
+        assert!(!default_format.is_empty()); // Should not be empty
+        assert!(
+            default_format.contains(':'),
+            "Default format should contain time separators"
+        );
+
+        let date_format = safe_time_format(&now, "%Y-%m-%d");
+        assert_eq!(date_format.len(), 10); // e.g. "2024-03-20"
+
+        let invalid_format = safe_time_format(&now, "%)H");
+        assert!(!default_format.is_empty()); // Should not be empty
+        assert!(
+            invalid_format.contains(':'),
+            "Invalid format should contain time separators"
+        );
+
+        assert!(!default_format.is_empty()); // Should not be empty
+
+        let no_time_format = safe_time_format(&now, "no_time_format");
+        assert!(!no_time_format.is_empty()); // Should fall back to default format
+        assert_eq!(no_time_format.as_str(), "no_time_format"); // Should fall back to default format
     }
 }

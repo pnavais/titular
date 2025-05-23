@@ -6,10 +6,7 @@ use std::{
 
 use nu_ansi_term::Color::Yellow;
 
-use crate::{
-    config::{MainConfig, DEFAULT_TEMPLATE_EXT},
-    error::*,
-};
+use crate::{config::MainConfig, error::*, DEFAULT_TEMPLATE_EXT};
 
 pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 name    = \"Basic\"\n\

@@ -3,10 +3,10 @@ pub struct TemplateFetcher;
 use std::{fmt::Write, io::Write as _, path::PathBuf};
 
 use crate::{
-    config::DEFAULT_TEMPLATE_EXT,
     dispatcher::{Dispatcher, URLDispatcher},
     reader::TemplateReader,
     utils::{self, create_backup, remove_backup, restore_backup},
+    DEFAULT_TEMPLATE_EXT,
 };
 
 use isahc::{

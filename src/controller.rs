@@ -5,22 +5,18 @@ use std::{
 };
 
 use crate::{
-    config::{MainConfig, DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME},
-    context::Context,
-    debug, display,
-    error::*,
-    reader::TemplateReader,
-    transforms::TRANSFORM_REGISTRY,
-    writer::TemplateWriter,
+    config::MainConfig, context::Context, debug, display, error::*, reader::TemplateReader,
+    transforms::TRANSFORM_REGISTRY, writer::TemplateWriter, DEFAULT_TEMPLATE_EXT,
+    DEFAULT_TEMPLATE_NAME,
 };
+
+#[cfg(feature = "fetcher")]
+use crate::DEFAULT_REMOTE_REPO;
 
 use crate::utils;
 
 #[cfg(feature = "fetcher")]
 use crate::fetcher::TemplateFetcher;
-
-#[cfg(feature = "fetcher")]
-use crate::config::DEFAULT_REMOTE_REPO;
 
 #[cfg(feature = "display")]
 use crate::theme::ThemeManager;

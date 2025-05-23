@@ -1,3 +1,4 @@
+use chrono::Local;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error as StdError;
@@ -10,8 +11,11 @@ use crate::error::*;
 use crate::filters::color;
 use crate::filters::style;
 use crate::transforms::Transform;
+use crate::utils::safe_time_format;
+use crate::DEFAULT_TIME_FORMAT;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+static TIME_PATTERN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{\s*time\s*\}\}").unwrap());
 
 pub struct TemplateRenderer {}
 
@@ -26,12 +30,13 @@ impl TemplateRenderer {
     /// Pre-processes the template pattern to add default filter to all variables
     ///
     /// # Arguments
+    /// * `context` - The context containing configuration and variables
     /// * `pattern` - The template pattern to pre-process
     ///
     /// # Returns
     /// A pre-processed template pattern
-    fn pre_process_pattern(pattern: &str) -> String {
-        TERA_VAR_REGEX
+    fn pre_process_pattern(context: &Context, pattern: &str) -> String {
+        let mut processed = TERA_VAR_REGEX
             .replace_all(pattern, |caps: &regex::Captures| {
                 let content = caps.get(1).unwrap().as_str().trim();
                 if content.contains('|') {
@@ -51,7 +56,22 @@ impl TemplateRenderer {
                     format!("{{{{ {} | default(value='') }}}}", content)
                 }
             })
-            .to_string()
+            .to_string();
+
+        // Add time if with-time flag is present
+        if context.is_active("with-time") {
+            let time_format = context
+                .get("defaults.time_format")
+                .unwrap_or(DEFAULT_TIME_FORMAT);
+            let time_pattern = context
+                .get("defaults.time_pattern")
+                .unwrap_or(" [{{ time }}]");
+            let current_time = safe_time_format(&Local::now(), time_format);
+            let processed_time = TIME_PATTERN_REGEX.replace_all(time_pattern, &current_time);
+            processed.push_str(&processed_time);
+        }
+
+        processed
     }
 
     /// Renders a template string using the provided context and applies the transform chain
@@ -76,7 +96,7 @@ impl TemplateRenderer {
             .to_lowercase()
             .replace(" ", "_");
 
-        let pattern = Self::pre_process_pattern(pattern_data);
+        let pattern = Self::pre_process_pattern(&context, pattern_data);
         let mut tera = Tera::default();
 
         // Register filters

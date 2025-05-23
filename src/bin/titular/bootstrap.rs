@@ -2,15 +2,14 @@ use chrono::prelude::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
-use titular::config::DEFAULT_TEMPLATE_NAME;
-
-pub use titular::{
-    config::{parse as config_parse, MainConfig},
-    error::*,
-};
 
 #[cfg(feature = "fetcher")]
-use titular::config::DEFAULT_REMOTE_REPO;
+use titular::DEFAULT_REMOTE_REPO;
+use titular::{
+    config::{parse as config_parse, MainConfig},
+    error::*,
+    DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT,
+};
 
 use crate::directories::PROJECT_DIRS;
 
@@ -20,8 +19,8 @@ static DEFAULT_CONF: &str = "# File automatically generated on ${date}\n\
                             width          = \"full\"\n\
                             surround_start = \"[\"\n\
                             surround_end   = \"]\"\n\
-                            time_pattern   = \"${space}%{time:fg[tc]}\"\n\
-                            time_format    = \"%H:%M:%S\"\n\
+                            time_pattern   = \"{{space}}[{{time}}]\"\n\
+                            time_format    = \"${default_time_format}\"\n\
                             display        = \"${default_pager}\"\n\n\
                             [vars]\n\
                             steel_blue   = \"RGB(70, 130, 180)\"\n\
@@ -137,6 +136,7 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
         .replacen("${templates_dir}", &templates_dir, 1)
         .replacen("${date}", &current_date.to_string(), 1)
         .replacen("${default_template_name}", DEFAULT_TEMPLATE_NAME, 1)
+        .replacen("${default_time_format}", DEFAULT_TIME_FORMAT, 1)
         .replacen(
             "${default_pager}",
             #[cfg(feature = "display")]

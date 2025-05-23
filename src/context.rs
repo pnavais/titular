@@ -400,4 +400,32 @@ impl Context {
             count += 1;
         }
     }
+
+    /// Prints debug information about the context's contents
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use titular::context::Context;
+    ///
+    /// let mut ctx = Context::new();
+    /// ctx.insert("name", "John");
+    /// ctx.insert("age", "30");
+    /// ctx.debug(); // Will print all context variables
+    /// ```
+    pub fn debug(&self) {
+        println!("\nContext Debug Information:");
+        println!("------------------------");
+        println!("Template Variables:");
+        for key in &self.template.keys {
+            if let Some(value) = self.get_raw(key) {
+                println!("  {} = {:?}", key, value);
+            }
+        }
+        println!("\nRegistry Items:");
+        for (key, _) in &self.registry.items {
+            println!("  {} = <object>", key);
+        }
+        println!("------------------------\n");
+    }
 }
