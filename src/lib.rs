@@ -36,16 +36,15 @@ pub mod error;
 #[cfg(feature = "fetcher")]
 pub mod fetcher;
 pub mod filters;
-pub mod formatter;
 #[cfg(feature = "fetcher")]
 pub mod github;
 pub mod log;
-pub mod processor;
 pub mod reader;
 pub mod string_utils;
 #[cfg(feature = "minimal")]
 pub mod term;
 #[cfg(feature = "display")]
 pub mod theme;
+pub mod transforms;
 pub mod utils;
 pub mod writer;

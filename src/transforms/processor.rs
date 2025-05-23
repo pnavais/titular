@@ -1,11 +1,12 @@
-use std::sync::Arc;
-
 use crate::context::Context;
+use crate::error::Result;
 use crate::string_utils::{expand_to_width, AnsiTruncateBehavior, Truncate};
 use crate::term::TERM_SIZE;
+use crate::transforms::Transform;
 use console::strip_ansi_codes;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::{Arc, Mutex};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Represents a matched padding group with its position and width information
@@ -20,74 +21,34 @@ static PAD_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"pad\(((?:[^()]|\([^()]*\))*)\)").unwrap());
 
 pub struct TextProcessor {
-    get_width: Box<dyn Fn() -> usize + Send + Sync>,
-    context: Arc<Context>,
+    get_width: Arc<Mutex<Box<dyn Fn() -> usize + Send + Sync>>>,
 }
 
 impl Default for TextProcessor {
     fn default() -> Self {
-        Self::new(Self::default_width(), Context::default())
+        Self::new(Self::default_width())
     }
 }
 
+/// TextProcessor is a transform that processes the text with padding groups.
+/// It is used to process functions that need global line width information for applying
+/// operations like padding and line wrapping.
 impl TextProcessor {
     /// Returns the default width function
     fn default_width() -> Box<dyn Fn() -> usize + Send + Sync> {
         Box::new(|| TERM_SIZE.get_term_width())
     }
 
-    /// Creates a new TextProcessor with a custom width provider and context
+    /// Creates a new TextProcessor with a custom width provider
     ///
     /// # Arguments
     /// * `width_provider` - A function that returns the width of the terminal
-    /// * `context` - The context to use for the TextProcessor
     ///
     /// # Returns
-    /// A new TextProcessor with the specified width provider and context
-    pub fn new(width_provider: Box<dyn Fn() -> usize + Send + Sync>, context: Context) -> Self {
+    /// A new TextProcessor with the specified width provider
+    pub fn new(width_provider: Box<dyn Fn() -> usize + Send + Sync>) -> Self {
         Self {
-            get_width: width_provider,
-            context: Arc::new(context),
-        }
-    }
-
-    /// Creates a new TextProcessor with default width provider and the given context
-    ///
-    /// # Arguments
-    /// * `context` - The shared context to use for the TextProcessor
-    ///
-    /// # Returns
-    /// A new TextProcessor with the specified context
-    pub fn with_context(context: Arc<Context>) -> Self {
-        // Check if context has a width parameter
-        if let Some(width) = context.get("width") {
-            if let Ok(width) = width.parse::<u8>() {
-                return Self::with_context_and_width(context, width);
-            }
-        }
-
-        // If no width parameter or invalid, use default width provider
-        Self {
-            context,
-            ..Default::default()
-        }
-    }
-
-    /// Creates a new TextProcessor with default width provider and the given context
-    ///
-    /// # Arguments
-    /// * `context` - The shared context to use for the TextProcessor
-    /// * `max_width` - The percentage of terminal width to use (0-100)
-    ///
-    /// # Returns
-    /// A new TextProcessor with the specified context and width
-    pub fn with_context_and_width(context: Arc<Context>, max_width: u8) -> Self {
-        Self {
-            context,
-            get_width: Box::new(move || {
-                let term_width = Self::default_width()();
-                (term_width * max_width as usize) / 100
-            }),
+            get_width: Arc::new(Mutex::new(width_provider)),
         }
     }
 
@@ -121,7 +82,7 @@ impl TextProcessor {
 
         let (padding_groups, occupied_space, non_empty_groups) =
             self.extract_padding_groups(content, &pad_groups);
-        let target_width = (self.get_width)();
+        let target_width = self.get_width.lock().unwrap()();
         let space_per_group = if non_empty_groups > 0 {
             (target_width.saturating_sub(occupied_space) as f64 / non_empty_groups as f64).ceil()
                 as usize
@@ -205,5 +166,18 @@ impl TextProcessor {
             .count();
 
         (padding_groups, occupied_space, non_empty_groups)
+    }
+}
+
+impl Transform for TextProcessor {
+    fn transform(&self, context: Arc<Context>, text: &str) -> Result<String> {
+        // Check if context has a width parameter
+        if let Some(width) = context.get("width").and_then(|w| w.parse::<u8>().ok()) {
+            *self.get_width.lock().unwrap() = Box::new(move || {
+                let term_width = Self::default_width()();
+                (term_width * width as usize) / 100
+            });
+        }
+        Ok(self.process_padding(text))
     }
 }

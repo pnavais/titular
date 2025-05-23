@@ -261,7 +261,6 @@ mod tests {
         // Test basic ASCII truncation
         let mut s = String::from("Hello World");
         s.truncate_ansi(5);
-        println!("Test 1: {}|{}\n------------", s, s.len());
         assert_eq!(s, "Hello");
 
         // Test truncation with ANSI colors

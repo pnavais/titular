@@ -1,14 +1,9 @@
 use crate::error::{Error, Result};
 use serde::Serialize;
 use serde_json::value::Value;
-use std::collections::HashSet;
+use std::any::Any;
+use std::collections::{HashMap, HashSet};
 use tera::Context as TeraContext;
-
-#[derive(Debug)]
-pub enum Modifier {
-    INV,
-    NONE,
-}
 
 #[derive(Debug)]
 pub struct MissingVar {
@@ -16,19 +11,75 @@ pub struct MissingVar {
     pub var: String,
 }
 
+/// Template context for variable substitution
 #[derive(Debug, Default)]
-pub struct Context {
+struct TemplateContext {
     data: TeraContext,
     keys: HashSet<&'static str>,
+}
+
+/// Registry for storing and retrieving arbitrary components
+#[derive(Debug, Default)]
+struct Registry {
+    items: HashMap<&'static str, Box<dyn Any + Send + Sync>>,
+}
+
+#[derive(Debug, Default)]
+pub struct Context {
+    template: TemplateContext,
+    registry: Registry,
 }
 
 /// Provides the methods to access the values present in the context struct
 impl Context {
     pub fn new() -> Self {
         Context {
-            data: TeraContext::new(),
-            keys: HashSet::new(),
+            template: TemplateContext::default(),
+            registry: Registry::default(),
         }
+    }
+
+    /// Stores a component in the registry
+    ///
+    /// # Arguments
+    /// * `key` - The key to store the component under
+    /// * `value` - The component to store
+    ///
+    /// # Returns
+    /// The key used to store the component
+    pub fn store_object<T: 'static + Send + Sync>(&mut self, key: &str, value: T) -> &'static str {
+        let key_str = key.to_string();
+        let key_ref: &'static str = Box::leak(key_str.into_boxed_str());
+        self.registry.items.insert(key_ref, Box::new(value));
+        key_ref
+    }
+
+    /// Retrieves a component from the registry
+    ///
+    /// # Arguments
+    /// * `key` - The key to retrieve the component for
+    ///
+    /// # Returns
+    /// An option containing a reference to the component if found
+    pub fn get_object<T: 'static + Send + Sync>(&self, key: &str) -> Option<&T> {
+        self.registry
+            .items
+            .get(key)
+            .and_then(|obj| obj.downcast_ref::<T>())
+    }
+
+    /// Removes a component from the registry
+    ///
+    /// # Arguments
+    /// * `key` - The key to remove the component for
+    ///
+    /// # Returns
+    /// The removed component if found
+    pub fn remove_object<T: 'static + Send + Sync>(&mut self, key: &str) -> Option<T> {
+        self.registry
+            .items
+            .remove(key)
+            .and_then(|obj| obj.downcast::<T>().ok().map(|boxed| *boxed))
     }
 
     /// Resolves a variable reference in the format $var or ${var:default_value}
@@ -84,7 +135,7 @@ impl Context {
 
     /// Returns a reference to the underlying tera context
     pub fn get_data(&self) -> &TeraContext {
-        &self.data
+        &self.template.data
     }
 
     /// Attempts to resolve a list of previously failed variables
@@ -102,8 +153,8 @@ impl Context {
                     missing.var
                 }),
             };
-            self.data.insert(missing.key, &value);
-            self.keys.insert(missing.key);
+            self.template.data.insert(missing.key, &value);
+            self.template.keys.insert(missing.key);
         }
     }
 
@@ -171,7 +222,7 @@ impl Context {
     /// * `context` - The context to extend the current context with.
     pub fn append_from(&mut self, context: &Context) {
         let mut missing_vars = Vec::new();
-        for key in &context.keys {
+        for key in &context.template.keys {
             if let Some(value) = context.get_raw(key) {
                 if let Some(missing) = self.insert(*key, value) {
                     missing_vars.push(missing);
@@ -217,14 +268,14 @@ impl Context {
         };
 
         let key_ref: &'static str = Box::leak(key_str.into_boxed_str());
-        self.data.insert(key_ref, &value);
-        self.keys.insert(key_ref);
+        self.template.data.insert(key_ref, &value);
+        self.template.keys.insert(key_ref);
         failed_value.map(|var| MissingVar { key: key_ref, var })
     }
 
     /// Checks whether the context provides the given key
     pub fn contains<S: AsRef<str>>(&self, name: S) -> bool {
-        self.data.contains_key(name.as_ref())
+        self.template.data.contains_key(name.as_ref())
     }
 
     /// Retrieves the raw value from the context for the given key (if available).
@@ -235,7 +286,7 @@ impl Context {
     /// # Returns
     /// Returns an option containing a reference to the value associated with the given key.
     pub fn get_raw(&self, key: &str) -> Option<&Value> {
-        self.data.get(key)
+        self.template.data.get(key)
     }
 
     /// Retrieves a single value from the context for the given key (if available)
@@ -283,7 +334,7 @@ impl Context {
     /// # Returns
     /// Returns `true` if the key exists and its value is "true" or "1", `false` otherwise.
     pub fn get_flag(&self, key: &str) -> Option<bool> {
-        match self.data.get(key) {
+        match self.template.data.get(key) {
             Some(v) => Some(matches!(
                 v.as_str()?.trim().to_lowercase().as_str(),
                 "true" | "1"
@@ -324,8 +375,8 @@ impl Context {
         let json_values = Value::Array(resolved_values);
 
         let key_ref: &'static str = Box::leak(key.to_string().into_boxed_str());
-        self.data.insert(key_ref, &json_values);
-        self.keys.insert(key_ref);
+        self.template.data.insert(key_ref, &json_values);
+        self.template.keys.insert(key_ref);
     }
 
     /// Inserts multiple values incrementally for an initial key i.e. : the key name
