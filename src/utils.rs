@@ -1,5 +1,6 @@
 use crate::error::*;
 use nu_ansi_term::Color::{Blue, Yellow};
+use num;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -228,6 +229,65 @@ pub fn remove_backup(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Safely parses a string into a numeric type, clamping the value to the type's bounds
+/// if it exceeds them.
+///
+/// # Arguments
+///
+/// * `s` - The string to parse
+///
+/// # Returns
+///
+/// The parsed value, clamped to the type's bounds if necessary, or 0 if the input is not numeric
+///
+/// # Examples
+///
+/// ```
+/// use titular::utils::safe_parse;
+///
+/// assert_eq!(safe_parse::<u8>("255"), 255);
+/// assert_eq!(safe_parse::<u8>("256"), 255); // Clamped to u8::MAX
+/// assert_eq!(safe_parse::<u8>("-1"), 0);    // Clamped to u8::MIN
+/// assert_eq!(safe_parse::<u8>("abc"), 0);   // Non-numeric returns 0
+/// assert_eq!(safe_parse::<i8>("-128"), -128);
+/// assert_eq!(safe_parse::<i8>("-129"), -128); // Clamped to i8::MIN
+/// ```
+pub fn safe_parse<T>(s: &str) -> T
+where
+    T: std::str::FromStr
+        + std::cmp::PartialOrd
+        + Copy
+        + num::Bounded
+        + num::Zero
+        + std::fmt::Display,
+{
+    // First try to parse as i64 to handle any numeric value
+    match s.parse::<i64>() {
+        Ok(val) => {
+            if val < 0 {
+                if T::min_value() < T::zero() {
+                    // For signed types, clamp to min_value
+                    T::min_value()
+                } else {
+                    // For unsigned types, clamp to zero
+                    T::zero()
+                }
+            } else if val
+                > T::max_value()
+                    .to_string()
+                    .parse::<i64>()
+                    .unwrap_or(i64::MAX)
+            {
+                T::max_value()
+            } else {
+                // Now we know it's a valid number in range, parse as the target type
+                s.parse::<T>().unwrap_or(T::zero())
+            }
+        }
+        Err(_) => T::zero(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -412,5 +472,36 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_safe_parse() {
+        // Test u8 parsing
+        assert_eq!(safe_parse::<u8>("0"), 0);
+        assert_eq!(safe_parse::<u8>("255"), 255);
+        assert_eq!(safe_parse::<u8>("256"), 255); // Clamped to u8::MAX
+        assert_eq!(safe_parse::<u8>("-1"), 0); // Clamped to u8::MIN
+        assert_eq!(safe_parse::<u8>("abc"), 0); // Non-numeric returns 0
+
+        // Test i8 parsing
+        assert_eq!(safe_parse::<i8>("-128"), -128);
+        assert_eq!(safe_parse::<i8>("127"), 127);
+        assert_eq!(safe_parse::<i8>("-129"), -128); // Clamped to i8::MIN
+        assert_eq!(safe_parse::<i8>("128"), 127); // Clamped to i8::MAX
+        assert_eq!(safe_parse::<i8>("abc"), 0); // Non-numeric returns 0
+
+        // Test u16 parsing
+        assert_eq!(safe_parse::<u16>("0"), 0);
+        assert_eq!(safe_parse::<u16>("65535"), 65535);
+        assert_eq!(safe_parse::<u16>("65536"), 65535); // Clamped to u16::MAX
+        assert_eq!(safe_parse::<u16>("-1"), 0); // Clamped to u16::MIN
+        assert_eq!(safe_parse::<u16>("abc"), 0); // Non-numeric returns 0
+
+        // Test i16 parsing
+        assert_eq!(safe_parse::<i16>("-32768"), -32768);
+        assert_eq!(safe_parse::<i16>("32767"), 32767);
+        assert_eq!(safe_parse::<i16>("-32769"), -32768); // Clamped to i16::MIN
+        assert_eq!(safe_parse::<i16>("32768"), 32767); // Clamped to i16::MAX
+        assert_eq!(safe_parse::<i16>("abc"), 0); // Non-numeric returns 0
     }
 }

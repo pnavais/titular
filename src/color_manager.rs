@@ -1,3 +1,4 @@
+use crate::utils::safe_parse;
 use nu_ansi_term::{Color, Color::*, Style};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -127,9 +128,10 @@ impl ColorManager {
     ) -> Option<Color> {
         if RGB_REGEX.is_match(color_str) {
             let groups = RGB_REGEX.captures(color_str).unwrap();
-            let r: u8 = groups.get(1).map_or("", |m| m.as_str()).parse().unwrap();
-            let g: u8 = groups.get(2).map_or("", |m| m.as_str()).parse().unwrap();
-            let b: u8 = groups.get(3).map_or("", |m| m.as_str()).parse().unwrap();
+            let r: u8 = safe_parse(groups.get(1).map_or("", |m| m.as_str()));
+            let g: u8 = safe_parse(groups.get(2).map_or("", |m| m.as_str()));
+            let b: u8 = safe_parse(groups.get(3).map_or("", |m| m.as_str()));
+            println!("r: {}, g: {}, b: {}", r, g, b);
             Some(Color::Rgb(r, g, b))
         } else if FNAME_REGEX.is_match(color_str) {
             let groups = FNAME_REGEX.captures(color_str).unwrap();
@@ -139,9 +141,9 @@ impl ColorManager {
                 .map_or("", |m| m.as_str())
                 .to_uppercase();
             if operator == "FIXED" {
-                Some(Fixed(
-                    groups.get(3).map_or("", |m| m.as_str()).parse().unwrap(),
-                ))
+                Some(Fixed(safe_parse::<u8>(
+                    groups.get(3).map_or("", |m| m.as_str()),
+                )))
             } else if operator == "NAME" {
                 ColorManager::to_colour_name(groups.get(5).map_or("", |m| m.as_str()))
             } else {
