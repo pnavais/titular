@@ -28,6 +28,7 @@
 pub mod color_manager;
 pub mod config;
 pub mod context;
+pub mod context_manager;
 pub mod controller;
 #[cfg(feature = "fetcher")]
 pub mod dispatcher;

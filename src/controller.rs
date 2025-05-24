@@ -1,13 +1,12 @@
 use std::{
     io::{stdin, stdout, Write},
     path::PathBuf,
-    sync::Arc,
 };
 
 use crate::{
-    config::MainConfig, context::Context, debug, display, error::*, reader::TemplateReader,
-    transforms::TRANSFORM_REGISTRY, writer::TemplateWriter, DEFAULT_TEMPLATE_EXT,
-    DEFAULT_TEMPLATE_NAME,
+    config::MainConfig, context::Context, context_manager::ContextManager, debug, display,
+    error::*, reader::TemplateReader, transforms::TRANSFORM_REGISTRY, writer::TemplateWriter,
+    DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME,
 };
 
 #[cfg(feature = "fetcher")]
@@ -352,28 +351,6 @@ impl<'a> TemplatesController<'a> {
         Ok((path, template, template_created))
     }
 
-    /// Builds a shared context from multiple sources
-    ///
-    /// # Arguments
-    /// * `context` - The base context
-    /// * `template_vars` - The template variables
-    /// * `config_vars` - The configuration variables
-    ///
-    /// # Returns
-    /// A Context containing all variables
-    fn build_context(
-        &self,
-        context: &Context,
-        template_vars: &std::collections::BTreeMap<String, String>,
-        config_vars: &std::collections::BTreeMap<String, String>,
-    ) -> Context {
-        let mut ctx = Context::new();
-        ctx.append_from(context);
-        ctx.append(template_vars);
-        ctx.append(config_vars);
-        ctx
-    }
-
     /// Performs the rendering of the template using the template formatter.
     /// In case it's not present (and is not the default template), it will be downloaded
     /// automatically from the remote repository (if the "fetcher" feature is enabled).
@@ -389,14 +366,19 @@ impl<'a> TemplatesController<'a> {
 
         let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
         let pattern_data = template_payload.pattern.data.to_string();
-        let mut shared_context =
-            self.build_context(context, &template_payload.vars, &self.config.vars);
-        shared_context.store_object("template_config", template_payload);
+
+        // Update the context in a clean way
+        ContextManager::get().update(|ctx| {
+            ctx.append_from(context);
+            ctx.append(&template_payload.vars);
+            ctx.append(&self.config.vars);
+            ctx.store_object("template_config", template_payload);
+        })?;
 
         write!(
             std::io::stdout(),
             "{}",
-            self.postprocess_template(Arc::new(shared_context), &pattern_data)?
+            self.postprocess_template(&pattern_data)?
         )?;
         Ok(true)
     }
@@ -438,12 +420,11 @@ impl<'a> TemplatesController<'a> {
     /// Post-processes the formatted template by applying all registered transforms
     ///
     /// # Arguments
-    /// * `context` - The shared context for transformations
     /// * `text` - The formatted text to process
     ///
     /// # Returns
     /// The processed text after applying all transforms
-    fn postprocess_template(&self, context: Arc<Context>, text: &str) -> Result<String> {
-        TRANSFORM_REGISTRY.process(context, text)
+    fn postprocess_template(&self, text: &str) -> Result<String> {
+        TRANSFORM_REGISTRY.process(text)
     }
 }

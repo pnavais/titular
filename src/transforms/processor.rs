@@ -1,4 +1,4 @@
-use crate::context::Context;
+use crate::context_manager::ContextManager;
 use crate::error::Result;
 use crate::string_utils::{expand_to_width, AnsiTruncateBehavior, Truncate};
 use crate::term::TERM_SIZE;
@@ -170,9 +170,10 @@ impl TextProcessor {
 }
 
 impl Transform for TextProcessor {
-    fn transform(&self, context: Arc<Context>, text: &str) -> Result<String> {
+    fn transform(&self, text: &str) -> Result<String> {
+        let ctx = ContextManager::get().read()?;
         // Check if context has a width parameter
-        if let Some(width) = context.get("width").and_then(|w| w.parse::<u8>().ok()) {
+        if let Some(width) = ctx.get("width").and_then(|w| w.parse::<u8>().ok()) {
             *self.get_width.lock().unwrap() = Box::new(move || {
                 let term_width = Self::default_width()();
                 (term_width * width as usize) / 100

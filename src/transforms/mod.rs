@@ -1,4 +1,3 @@
-use crate::context::Context;
 use crate::error::Result;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -14,15 +13,14 @@ pub use renderer::TemplateRenderer;
 
 /// Trait for text transformations in the formatter chain
 pub trait Transform: Send + Sync {
-    /// Transforms the input text using the provided context
+    /// Transforms the input text using the global context
     ///
     /// # Arguments
-    /// * `context` - The shared context for the transformation
     /// * `text` - The text to transform
     ///
     /// # Returns
     /// The transformed text or an error if transformation fails
-    fn transform(&self, context: Arc<Context>, text: &str) -> Result<String>;
+    fn transform(&self, text: &str) -> Result<String>;
 }
 
 pub struct TransformRegistry {
@@ -61,17 +59,14 @@ impl TransformRegistry {
     /// Process the text through all registered transforms in sequence
     ///
     /// # Arguments
-    /// * `context` - The shared context for transformations
     /// * `text` - The text to process
     ///
     /// # Returns
     /// The processed text after applying all transforms or an error if any transform fails
-    pub fn process(&self, context: Arc<Context>, text: &str) -> Result<String> {
+    pub fn process(&self, text: &str) -> Result<String> {
         self.order
             .iter()
-            .try_fold(text.to_string(), |acc, transform| {
-                transform.transform(Arc::clone(&context), &acc)
-            })
+            .try_fold(text.to_string(), |acc, transform| transform.transform(&acc))
     }
 }
 

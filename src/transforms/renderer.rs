@@ -2,11 +2,10 @@ use chrono::Local;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error as StdError;
-use std::sync::Arc;
 use tera::Tera;
 
 use crate::config::TemplateConfig;
-use crate::context::Context;
+use crate::context_manager::ContextManager;
 use crate::error::*;
 use crate::filters::color;
 use crate::filters::style;
@@ -15,7 +14,6 @@ use crate::utils::safe_time_format;
 use crate::DEFAULT_TIME_FORMAT;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
-static TIME_PATTERN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{\s*time\s*\}\}").unwrap());
 
 pub struct TemplateRenderer {}
 
@@ -30,12 +28,11 @@ impl TemplateRenderer {
     /// Pre-processes the template pattern to add default filter to all variables
     ///
     /// # Arguments
-    /// * `context` - The context containing configuration and variables
     /// * `pattern` - The template pattern to pre-process
     ///
     /// # Returns
     /// A pre-processed template pattern
-    fn pre_process_pattern(context: &Context, pattern: &str) -> String {
+    fn pre_process_pattern(pattern: &str) -> Result<String> {
         let mut processed = TERA_VAR_REGEX
             .replace_all(pattern, |caps: &regex::Captures| {
                 let content = caps.get(1).unwrap().as_str().trim();
@@ -59,69 +56,88 @@ impl TemplateRenderer {
             .to_string();
 
         // Add time if with-time flag is present
-        if context.is_active("with-time") {
-            let time_format = context
-                .get("defaults.time_format")
-                .unwrap_or(DEFAULT_TIME_FORMAT);
-            let time_pattern = context
-                .get("defaults.time_pattern")
-                .unwrap_or(" [{{ time }}]");
-            let current_time = safe_time_format(&Local::now(), time_format);
-            let processed_time = TIME_PATTERN_REGEX.replace_all(time_pattern, &current_time);
-            processed.push_str(&processed_time);
+        let time_info = {
+            let ctx = ContextManager::get().read()?;
+            if ctx.is_active("with-time") {
+                Some((
+                    ctx.get("defaults.time_format")
+                        .unwrap_or(DEFAULT_TIME_FORMAT)
+                        .to_string(),
+                    ctx.get("defaults.time_pattern")
+                        .unwrap_or(" [{{ time }}]")
+                        .to_string(),
+                ))
+            } else {
+                None
+            }
+        };
+
+        if let Some((time_format, time_pattern)) = time_info {
+            let current_time = safe_time_format(&Local::now(), &time_format);
+
+            // Insert the current time into the context
+            ContextManager::get().update(|ctx| {
+                ctx.insert("time", &current_time);
+            })?;
+
+            processed.push_str(&time_pattern);
         }
 
-        processed
+        Ok(processed)
     }
 
-    /// Renders a template string using the provided context and applies the transform chain
+    /// Renders a template string using the global context
     ///
     /// # Arguments
-    /// * `context` - The context containing the template configuration and variables
     /// * `pattern_data` - The pattern data to be rendered
     ///
     /// # Returns
     /// A rendered string
-    pub fn render(&self, context: Arc<Context>, pattern_data: &str) -> Result<String> {
-        // Get the template configuration from the context's registry
-        let template_content = context
-            .get_object::<TemplateConfig>("template_config")
-            .ok_or_else(|| {
-                Error::TemplateRenderError("Template configuration not found".to_string())
-            })?;
+    pub fn render(&self, pattern_data: &str) -> Result<String> {
+        let pattern = Self::pre_process_pattern(pattern_data)?;
 
-        let template_name = template_content
-            .details
-            .name
-            .to_lowercase()
-            .replace(" ", "_");
-
-        let pattern = Self::pre_process_pattern(&context, pattern_data);
         let mut tera = Tera::default();
+        tera.register_filter("color", color::create_color_filter());
+        tera.register_filter("style", style::create_style_filter());
 
-        // Register filters
-        tera.register_filter("color", color::create_color_filter(Arc::clone(&context)));
-        tera.register_filter("style", style::create_style_filter(Arc::clone(&context)));
+        // Get template name and pattern first
+        let template_name = {
+            let ctx = ContextManager::get().read()?;
+            let template_content = ctx
+                .get_object::<TemplateConfig>("template_config")
+                .ok_or_else(|| {
+                    Error::TemplateRenderError("Template configuration not found".to_string())
+                })?;
+
+            template_content
+                .details
+                .name
+                .to_lowercase()
+                .replace(" ", "_")
+        };
 
         tera.add_raw_template(&template_name, &pattern)?;
-        let template =
-            tera.render(&template_name, context.get_data())
+
+        // Do the render with the context directly
+        let template = {
+            let ctx = ContextManager::get().read()?;
+            tera.render(&template_name, ctx.get_data())
                 .map_err(|e: tera::Error| {
-                    println!("Error: {:?}", e);
                     let mut error_msg = e.to_string();
                     if let Some(source) = e.source() {
                         error_msg.push_str("\nCaused by: ");
                         error_msg.push_str(&source.to_string());
                     }
                     Error::TemplateRenderError(error_msg)
-                })?;
+                })?
+        };
 
         Ok(template)
     }
 }
 
 impl Transform for TemplateRenderer {
-    fn transform(&self, context: Arc<Context>, text: &str) -> Result<String> {
-        self.render(context, text)
+    fn transform(&self, text: &str) -> Result<String> {
+        self.render(text)
     }
 }
