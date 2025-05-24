@@ -33,7 +33,18 @@ impl TemplateRenderer {
     /// # Returns
     /// A pre-processed template pattern
     fn pre_process_pattern(pattern: &str) -> Result<String> {
-        let mut processed = TERA_VAR_REGEX
+        Self::add_time_marker(Self::add_default_markers(pattern))
+    }
+
+    /// Adds default markers to all variables in the pattern
+    ///
+    /// # Arguments
+    /// * `pattern` - The pattern to add default markers to
+    ///
+    /// # Returns
+    /// The processed pattern with default markers
+    fn add_default_markers(pattern: &str) -> String {
+        TERA_VAR_REGEX
             .replace_all(pattern, |caps: &regex::Captures| {
                 let content = caps.get(1).unwrap().as_str().trim();
                 if content.contains('|') {
@@ -53,9 +64,17 @@ impl TemplateRenderer {
                     format!("{{{{ {} | default(value='') }}}}", content)
                 }
             })
-            .to_string();
+            .to_string()
+    }
 
-        // Add time if with-time flag is present
+    /// Adds a time marker to the processed string if the with-time flag is active
+    ///
+    /// # Arguments
+    /// * `processed` - The processed string to add the time marker to
+    ///
+    /// # Returns
+    /// Result containing the processed string
+    fn add_time_marker(mut processed: String) -> Result<String> {
         let time_info = {
             let ctx = ContextManager::get().read()?;
             if ctx.is_active("with-time") {
@@ -74,12 +93,10 @@ impl TemplateRenderer {
 
         if let Some((time_format, time_pattern)) = time_info {
             let current_time = safe_time_format(&Local::now(), &time_format);
-
             // Insert the current time into the context
             ContextManager::get().update(|ctx| {
                 ctx.insert("time", &current_time);
             })?;
-
             processed.push_str(&time_pattern);
         }
 
