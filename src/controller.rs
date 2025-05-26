@@ -4,13 +4,9 @@ use std::{
 };
 
 use crate::{
-    config::MainConfig, context::Context, context_manager::ContextManager, debug, display,
-    error::*, reader::TemplateReader, transforms::TRANSFORM_REGISTRY, writer::TemplateWriter,
-    DEFAULT_TEMPLATE_EXT, DEFAULT_TEMPLATE_NAME,
+    config::MainConfig, context::Context, display, error::*, formatter::TemplateFormatter,
+    writer::TemplateWriter, DEFAULT_TEMPLATE_EXT,
 };
-
-#[cfg(feature = "fetcher")]
-use crate::DEFAULT_REMOTE_REPO;
 
 use crate::utils;
 
@@ -362,69 +358,6 @@ impl<'a> TemplatesController<'a> {
     /// # Returns
     /// Returns `Ok(true)` if the template was rendered successfully, `Err(Error)` if the template does not exist.
     pub fn format(&self, context: &Context, template_name: &str) -> Result<bool> {
-        self.preprocess_template(template_name)?;
-
-        let template_payload = TemplateReader::read(&self.input_dir, template_name)?;
-        let pattern_data = template_payload.pattern.data.to_string();
-
-        // Update the context in a clean way
-        ContextManager::get().update(|ctx| {
-            ctx.append_from(context);
-            ctx.append(&template_payload.vars);
-            ctx.append(&self.config.vars);
-            ctx.store_object("template_config", template_payload);
-        })?;
-
-        write!(
-            std::io::stdout(),
-            "{}",
-            self.postprocess_template(&pattern_data)?
-        )?;
-        Ok(true)
-    }
-
-    /// Performs the preprocessing of the template.
-    /// In case we are pointing to a recoverable template, we try to recover it (i.e. basic).
-    /// In case the "fetched" feature is enabled, the template is downloaded
-    /// automatically in case it's not present (and is available in the remote repository).
-    ///
-    /// # Arguments
-    /// * `template_name` - The name of the template to be preprocessed.
-    ///
-    /// # Returns
-    /// Returns `Ok(())` if the template was preprocessed successfully, `Err(Error)` if the template does not exist.
-    fn preprocess_template(&self, template_name: &str) -> Result<()> {
-        let path = TemplateWriter::get_template_file(template_name);
-        let template = self.input_dir.clone().join(&path);
-
-        if !template.exists() && template_name == DEFAULT_TEMPLATE_NAME {
-            debug!("Recovering template");
-            TemplateWriter::write_new(&template, self.config)?;
-        }
-        #[cfg(feature = "fetcher")]
-        if !template.exists() {
-            // Try to fetch the template from the remote repository
-            TemplateFetcher::fetch_from_remote(
-                self.config
-                    .templates
-                    .remote_repo
-                    .as_deref()
-                    .unwrap_or(DEFAULT_REMOTE_REPO),
-                template_name,
-                &self.input_dir,
-            )?;
-        }
-        Ok(())
-    }
-
-    /// Post-processes the formatted template by applying all registered transforms
-    ///
-    /// # Arguments
-    /// * `text` - The formatted text to process
-    ///
-    /// # Returns
-    /// The processed text after applying all transforms
-    fn postprocess_template(&self, text: &str) -> Result<String> {
-        TRANSFORM_REGISTRY.process(text)
+        TemplateFormatter::new(&self.input_dir, self.config).format(context, template_name)
     }
 }

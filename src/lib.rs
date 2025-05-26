@@ -37,6 +37,7 @@ pub mod error;
 #[cfg(feature = "fetcher")]
 pub mod fetcher;
 pub mod filters;
+pub mod formatter;
 #[cfg(feature = "fetcher")]
 pub mod github;
 pub mod log;

@@ -70,9 +70,42 @@ impl TransformRegistry {
     }
 }
 
-// Global singleton instance
-pub static TRANSFORM_REGISTRY: Lazy<TransformRegistry> = Lazy::new(|| {
-    let mut registry = TransformRegistry::new();
-    registry.init();
-    registry
-});
+/// Global transform manager that provides thread-safe access to the shared transform registry
+pub struct TransformManager {
+    registry: Arc<TransformRegistry>,
+}
+
+impl TransformManager {
+    /// Gets a reference to the global transform manager
+    pub fn get() -> &'static TransformManager {
+        static INSTANCE: Lazy<TransformManager> = Lazy::new(|| {
+            let mut registry = TransformRegistry::new();
+            registry.init();
+            TransformManager {
+                registry: Arc::new(registry),
+            }
+        });
+        &INSTANCE
+    }
+
+    /// Gets a clone of the shared registry
+    pub fn share(&self) -> Arc<TransformRegistry> {
+        Arc::clone(&self.registry)
+    }
+
+    /// Process the text through all registered transforms in sequence
+    ///
+    /// # Arguments
+    /// * `text` - The text to process
+    ///
+    /// # Returns
+    /// The processed text after applying all transforms or an error if any transform fails
+    pub fn process(&self, text: &str) -> Result<String> {
+        self.registry.process(text)
+    }
+
+    /// Gets a transform by name
+    pub fn get_transform(&self, name: &str) -> Option<&Arc<Box<dyn Transform>>> {
+        self.registry.get(name)
+    }
+}
