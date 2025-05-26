@@ -24,7 +24,6 @@ impl Transform for LineHandler {
             let term = Term::stdout();
             term.clear_line()?;
             term.move_cursor_left(TERM_SIZE.get_term_width())?;
-            return Ok(text.to_string());
         }
 
         Ok(format!(
