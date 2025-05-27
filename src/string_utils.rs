@@ -74,6 +74,62 @@ pub fn expand_to_width(input: &str, target_width: usize) -> String {
     result
 }
 
+/// Expands a string to a target visual width by repeating its content.
+/// The width is calculated based on the actual display width of characters,
+/// taking into account wide characters like emojis.
+///
+/// # Arguments
+///
+/// * `input` - The input string to expand
+/// * `target_width` - The target width in display units
+///
+/// # Returns
+///
+/// A string expanded to the target visual width
+///
+/// # Examples
+///
+/// ```
+/// use titular::string_utils::expand_to_visual_width;
+///
+/// assert_eq!(expand_to_visual_width("X", 2), "XX");
+/// assert_eq!(expand_to_visual_width("XY", 3), "XYX");
+/// assert_eq!(expand_to_visual_width("📦", 4), "📦📦"); // Each emoji is 2 units wide
+/// assert_eq!(expand_to_visual_width("📦🌟", 6), "📦🌟📦"); // Each emoji is 2 units wide
+/// ```
+pub fn expand_to_visual_width(input: &str, target_width: usize) -> String {
+    // If input is empty, return as is
+    if input.is_empty() {
+        return input.to_string();
+    }
+
+    // Calculate current visual width
+    let current_width = measure_text_width(input);
+
+    // If target_width is 0 or less than or equal to current width, return input as-is
+    if target_width == 0 || current_width >= target_width {
+        return input.to_string();
+    }
+
+    // Calculate how many times we need to repeat the input
+    let repeat_count = (target_width + current_width - 1) / current_width;
+    let mut result = String::with_capacity(input.len() * repeat_count);
+
+    // Repeat the input
+    for _ in 0..repeat_count {
+        result.push_str(input);
+    }
+
+    // If we've exceeded the target width, truncate
+    if measure_text_width(&result) > target_width {
+        let mut truncated = result;
+        truncated.truncate_ansi(target_width);
+        truncated
+    } else {
+        result
+    }
+}
+
 /// Trait for truncating strings while preserving ANSI codes
 pub trait Truncate {
     /// Truncates a string to the specified width while preserving ANSI codes in place
@@ -252,6 +308,50 @@ mod tests {
         assert_eq!(expand_to_width("\x1b[31mH\x1b[0m", 1), "\x1b[31mH\x1b[0m");
         assert_eq!(
             expand_to_width("\x1b[31mH\x1b[0m", 2),
+            "\x1b[31mH\x1b[0m\x1b[31mH\x1b[0m"
+        );
+    }
+
+    #[test]
+    fn test_expand_to_visual_width() {
+        // Test basic ASCII characters
+        assert_eq!(expand_to_visual_width("X", 0), "X");
+        assert_eq!(expand_to_visual_width("X", 1), "X");
+        assert_eq!(expand_to_visual_width("X", 2), "XX");
+        assert_eq!(expand_to_visual_width("X", 3), "XXX");
+
+        // Test multi-character strings
+        assert_eq!(expand_to_visual_width("XY", 0), "XY");
+        assert_eq!(expand_to_visual_width("XY", 1), "XY");
+        assert_eq!(expand_to_visual_width("XY", 2), "XY");
+        assert_eq!(expand_to_visual_width("XY", 3), "XYX");
+        assert_eq!(expand_to_visual_width("XY", 4), "XYXY");
+
+        // Test emojis (each emoji is 2 units wide)
+        assert_eq!(expand_to_visual_width("📦", 0), "📦");
+        assert_eq!(expand_to_visual_width("📦", 1), "📦");
+        assert_eq!(expand_to_visual_width("📦", 2), "📦");
+        assert_eq!(expand_to_visual_width("📦", 3), "📦");
+        assert_eq!(expand_to_visual_width("📦", 4), "📦📦");
+        assert_eq!(expand_to_visual_width("📦", 5), "📦📦");
+        assert_eq!(expand_to_visual_width("📦", 6), "📦📦📦");
+
+        // Test mixed characters
+        assert_eq!(expand_to_visual_width("📦-", 4), "📦-");
+        assert_eq!(expand_to_visual_width("📦-", 5), "📦-📦"); // Visual width 3, needs to repeat to reach 5
+        assert_eq!(expand_to_visual_width("📦-", 6), "📦-📦-");
+
+        // Test ANSI escape codes
+        assert_eq!(
+            expand_to_visual_width("\x1b[31mH\x1b[0m", 0),
+            "\x1b[31mH\x1b[0m"
+        );
+        assert_eq!(
+            expand_to_visual_width("\x1b[31mH\x1b[0m", 1),
+            "\x1b[31mH\x1b[0m"
+        );
+        assert_eq!(
+            expand_to_visual_width("\x1b[31mH\x1b[0m", 2),
             "\x1b[31mH\x1b[0m\x1b[31mH\x1b[0m"
         );
     }

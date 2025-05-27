@@ -1,13 +1,12 @@
 use crate::context_manager::ContextManager;
 use crate::error::Result;
-use crate::string_utils::{expand_to_width, AnsiTruncateBehavior, Truncate};
+use crate::string_utils::{expand_to_visual_width, AnsiTruncateBehavior, Truncate};
 use crate::term::TERM_SIZE;
 use crate::transforms::Transform;
 use console::{measure_text_width, strip_ansi_codes};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::{Arc, Mutex};
-use unicode_segmentation::UnicodeSegmentation;
 
 /// Represents a matched padding group with its position and width information
 struct MatchedGroup {
@@ -74,9 +73,45 @@ impl TextProcessor {
     ///
     /// # Returns
     /// A string with the processed content
+    ///
+    /// # Note
+    /// When using wide characters (like emojis) for padding, the final width might be slightly
+    /// less than the target width due to quantization. This happens because:
+    /// 1. Wide characters must be displayed as complete units (can't be split)
+    /// 2. The terminal width is fixed, but our padding units are "quantized" by the width of the characters
+    /// 3. When there's a remainder that's less than the width of a character, we must round down
+    ///    to avoid exceeding the target width
+    ///
+    /// For example, with a target width of 164 and emojis (2 units wide):
+    /// - If we need 127 units of padding for 2 groups
+    /// - First group gets 64 units (32 emojis)
+    /// - Second group gets 63 units (31 emojis + 1 unit remainder)
+    /// - The 1 unit remainder can't be filled without exceeding the target width
     fn process_padding_line(&self, content: &str) -> String {
-        let (groups, text_without_pads, avg_padding) = self.extract_padding_groups(content);
-        content.to_string()
+        let (groups, text_without_pads) = self.extract_padding_groups(content);
+        let mut result = content.to_string();
+
+        // Calculate total padding needed and remainder
+        let max_width = self.get_width.lock().unwrap()();
+        let total_padding_needed = max_width - text_without_pads;
+        let base_padding = total_padding_needed / groups.len();
+        let remainder = total_padding_needed % groups.len();
+
+        // Replace each padding group with its content plus expanded content
+        for (i, group) in groups.iter().rev().enumerate() {
+            // Last group (first in reverse order) gets the remainder
+            let padding_width = if i == 0 {
+                base_padding + remainder
+            } else {
+                base_padding
+            };
+
+            let expanded_content = expand_to_visual_width(&group.content, padding_width);
+            let replacement = format!("{}{}", group.content, expanded_content);
+            result.replace_range(group.start..group.end, &replacement);
+        }
+
+        result
     }
 
     /// Extract padding groups from the content and calculate their information
@@ -88,18 +123,20 @@ impl TextProcessor {
     /// A tuple containing:
     /// - Vector of padding group information
     /// - Total occupied space (outside text + padding content)
-    /// - Number of non-empty padding groups
-    fn extract_padding_groups(&self, content: &str) -> (Vec<MatchedGroup>, usize, usize) {
+    fn extract_padding_groups(&self, content: &str) -> (Vec<MatchedGroup>, usize) {
         let stripped_content = strip_ansi_codes(content);
-        let (groups, total_group_length, total_content_length, non_empty_count) = PAD_PATTERN
-            .captures_iter(&stripped_content)
+        let stripped_width = measure_text_width(&stripped_content);
+
+        let (groups, total_group_length, total_content_length) = PAD_PATTERN
+            .captures_iter(content) // Use original content for matching
             .filter_map(|cap| {
                 cap.get(0).and_then(|matched| {
                     let pad_content = cap.get(1).map_or("", |m| m.as_str()).to_string();
                     let content_width = measure_text_width(&strip_ansi_codes(&pad_content));
-                    let group_length =
-                        measure_text_width(&stripped_content[matched.start()..matched.end()]);
-                    let is_non_empty = !pad_content.is_empty();
+
+                    // Get the stripped version of the matched group for width calculation
+                    let stripped_group = strip_ansi_codes(&content[matched.start()..matched.end()]);
+                    let group_length = measure_text_width(&stripped_group);
 
                     Some((
                         MatchedGroup {
@@ -109,34 +146,26 @@ impl TextProcessor {
                         },
                         group_length,
                         content_width,
-                        if is_non_empty { 1 } else { 0 },
                     ))
                 })
             })
             .fold(
-                (Vec::new(), 0, 0, 0),
-                |(mut groups, total_group_length, total_content_length, non_empty),
-                 (group, group_len, content_len, is_non_empty)| {
+                (Vec::new(), 0, 0),
+                |(mut groups, total_group_length, total_content_length),
+                 (group, group_len, content_len)| {
                     groups.push(group);
                     (
                         groups,
                         total_group_length + group_len,
                         total_content_length + content_len,
-                        non_empty + is_non_empty,
                     )
                 },
             );
 
-        let text_without_pads =
-            measure_text_width(&stripped_content) - total_group_length + total_content_length;
-        let avg_padding = if non_empty_count > 0 {
-            let max_width = self.get_width.lock().unwrap()();
-            ((max_width - text_without_pads) as f64 / non_empty_count as f64).ceil() as usize
-        } else {
-            0
-        };
-
-        (groups, text_without_pads, avg_padding)
+        (
+            groups,
+            stripped_width - total_group_length + total_content_length,
+        )
     }
 }
 

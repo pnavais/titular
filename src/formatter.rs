@@ -41,7 +41,11 @@ impl<'a> TemplateFormatter<'a> {
             ctx.store_object("template_config", template_payload);
         })?;
 
-        write!(stdout(), "{}", self.postprocess_template(&pattern_data)?)?;
+        write!(
+            stdout(),
+            "{}",
+            TransformManager::get().process(&pattern_data)?
+        )?;
         Ok(true)
     }
 
@@ -77,16 +81,5 @@ impl<'a> TemplateFormatter<'a> {
             )?;
         }
         Ok(())
-    }
-
-    /// Post-processes the formatted template by applying all registered transforms
-    ///
-    /// # Arguments
-    /// * `text` - The formatted text to process
-    ///
-    /// # Returns
-    /// The processed text after applying all transforms
-    fn postprocess_template(&self, text: &str) -> Result<String> {
-        TransformManager::get().process(text)
     }
 }
