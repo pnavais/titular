@@ -91,24 +91,26 @@ impl TextProcessor {
         let (groups, text_without_pads) = self.extract_padding_groups(content);
         let mut result = content.to_string();
 
-        // Calculate total padding needed and remainder
-        let max_width = self.get_width.lock().unwrap()();
-        let total_padding_needed = max_width - text_without_pads;
-        let base_padding = total_padding_needed / groups.len();
-        let remainder = total_padding_needed % groups.len();
+        if !groups.is_empty() {
+            // Calculate total padding needed and remainder
+            let max_width = self.get_width.lock().unwrap()();
+            let total_padding_needed = max_width.saturating_sub(text_without_pads);
+            let base_padding = total_padding_needed / groups.len();
+            let remainder = total_padding_needed % groups.len();
 
-        // Replace each padding group with its content plus expanded content
-        for (i, group) in groups.iter().rev().enumerate() {
-            // Last group (first in reverse order) gets the remainder
-            let padding_width = if i == 0 {
-                base_padding + remainder
-            } else {
-                base_padding
-            };
+            // Replace each padding group with its content plus expanded content
+            for (i, group) in groups.iter().rev().enumerate() {
+                // Last group (first in reverse order) gets the remainder
+                let padding_width = if i == 0 {
+                    base_padding + remainder
+                } else {
+                    base_padding
+                };
 
-            let expanded_content = expand_to_visual_width(&group.content, padding_width);
-            let replacement = format!("{}{}", group.content, expanded_content);
-            result.replace_range(group.start..group.end, &replacement);
+                let expanded_content = expand_to_visual_width(&group.content, padding_width);
+                let replacement = format!("{}{}", group.content, expanded_content);
+                result.replace_range(group.start..group.end, &replacement);
+            }
         }
 
         result
