@@ -1,6 +1,6 @@
 use crate::context_manager::ContextManager;
 use crate::error::Result;
-use crate::string_utils::{expand_to_visual_width, AnsiTruncateBehavior, Truncate};
+use crate::string_utils::expand_to_visual_width;
 use crate::term::TERM_SIZE;
 use crate::transforms::Transform;
 use console::{measure_text_width, strip_ansi_codes};
@@ -92,24 +92,55 @@ impl TextProcessor {
         let mut result = content.to_string();
 
         if !groups.is_empty() {
-            // Calculate total padding needed and remainder
-            let max_width = self.get_width.lock().unwrap()();
-            let total_padding_needed = max_width.saturating_sub(text_without_pads);
-            let base_padding = total_padding_needed / groups.len();
-            let remainder = total_padding_needed % groups.len();
+            // Filter out empty padding groups
+            let non_empty_groups: Vec<_> = groups
+                .iter()
+                .filter(|g| !strip_ansi_codes(&g.content).is_empty())
+                .collect();
 
-            // Replace each padding group with its content plus expanded content
-            for (i, group) in groups.iter().rev().enumerate() {
-                // Last group (first in reverse order) gets the remainder
-                let padding_width = if i == 0 {
-                    base_padding + remainder
-                } else {
-                    base_padding
-                };
+            if !non_empty_groups.is_empty() {
+                // Calculate total padding needed and remainder
+                let max_width = self.get_width.lock().unwrap()();
+                let total_padding_needed = max_width.saturating_sub(text_without_pads);
+                let base_padding = total_padding_needed / non_empty_groups.len();
+                let remainder = total_padding_needed % non_empty_groups.len();
 
-                let expanded_content = expand_to_visual_width(&group.content, padding_width);
-                let replacement = format!("{}{}", group.content, expanded_content);
-                result.replace_range(group.start..group.end, &replacement);
+                // Process all groups in reverse order to maintain correct indices
+                for (i, group) in groups.iter().rev().enumerate() {
+                    if strip_ansi_codes(&group.content).is_empty() {
+                        // Remove empty padding groups
+                        result.replace_range(group.start..group.end, "");
+                    } else {
+                        // Calculate padding for non-empty groups
+                        let padding_width = if i == 0 {
+                            base_padding + remainder
+                        } else {
+                            base_padding
+                        };
+
+                        // Expand the stripped content
+                        let stripped_content = strip_ansi_codes(&group.content);
+                        let expanded_content =
+                            expand_to_visual_width(&stripped_content, padding_width);
+
+                        // Find the actual content position in the original string
+                        let content_start = group
+                            .content
+                            .find(&stripped_content.to_string())
+                            .unwrap_or(0);
+                        let content_end = content_start + stripped_content.len();
+
+                        // Extract ANSI codes before and after the content
+                        let prefix = &group.content[..content_start];
+                        let suffix = &group.content[content_end..];
+
+                        // Combine the ANSI codes with the expanded content
+                        let final_content = format!("{}{}{}", prefix, expanded_content, suffix);
+
+                        // Replace the entire pad() structure with the expanded content
+                        result.replace_range(group.start..group.end, &final_content);
+                    }
+                }
             }
         }
 
@@ -129,12 +160,11 @@ impl TextProcessor {
         let stripped_content = strip_ansi_codes(content);
         let stripped_width = measure_text_width(&stripped_content);
 
-        let (groups, total_group_length, total_content_length) = PAD_PATTERN
+        let (groups, total_group_length) = PAD_PATTERN
             .captures_iter(content) // Use original content for matching
             .filter_map(|cap| {
                 cap.get(0).and_then(|matched| {
                     let pad_content = cap.get(1).map_or("", |m| m.as_str()).to_string();
-                    let content_width = measure_text_width(&strip_ansi_codes(&pad_content));
 
                     // Get the stripped version of the matched group for width calculation
                     let stripped_group = strip_ansi_codes(&content[matched.start()..matched.end()]);
@@ -147,27 +177,21 @@ impl TextProcessor {
                             end: matched.end(),
                         },
                         group_length,
-                        content_width,
                     ))
                 })
             })
             .fold(
-                (Vec::new(), 0, 0),
-                |(mut groups, total_group_length, total_content_length),
-                 (group, group_len, content_len)| {
+                (Vec::new(), 0),
+                |(mut groups, total_group_length), (group, group_len)| {
                     groups.push(group);
-                    (
-                        groups,
-                        total_group_length + group_len,
-                        total_content_length + content_len,
-                    )
+                    (groups, total_group_length + group_len)
                 },
             );
 
-        (
-            groups,
-            stripped_width - total_group_length + total_content_length,
-        )
+        // Calculate the width of the text without padding groups
+        let text_without_pads = stripped_width - total_group_length;
+
+        (groups, text_without_pads)
     }
 }
 
