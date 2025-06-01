@@ -2,6 +2,7 @@ use chrono::Local;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error as StdError;
+use std::sync::Mutex;
 use tera::Tera;
 
 use crate::config::TemplateConfig;
@@ -14,6 +15,18 @@ use crate::utils::safe_time_format;
 use crate::DEFAULT_TIME_FORMAT;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+
+static TERA: Lazy<Mutex<Tera>> = Lazy::new(|| {
+    let mut tera = Tera::default();
+    tera.register_filter("color", color::create_color_filter());
+    tera.register_filter("style", style::create_style_filter());
+    Mutex::new(tera)
+});
+
+static FILTER_ARGS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    // Captures: 1=filter_name, 2=arguments
+    Regex::new(r"(\w+)\(([^)]+)\)").unwrap()
+});
 
 pub struct TemplateRenderer {}
 
@@ -36,6 +49,33 @@ impl TemplateRenderer {
         Self::add_time_marker(Self::add_default_markers(pattern))
     }
 
+    /// Extracts filter arguments and adds default values for unquoted values to the context
+    /// if not already present.
+    ///
+    /// # Arguments
+    /// * `filter_chain` - The filter chain to process
+    ///
+    fn process_filter_args(filter_chain: &str) {
+        // Skip the variable part and process only the filters
+        filter_chain
+            .split('|')
+            .skip(1) // Skip the variable part (before first |)
+            .flat_map(|args_part| FILTER_ARGS_REGEX.captures_iter(args_part))
+            .filter_map(|caps| caps.get(2).map(|m| m.as_str()))
+            .flat_map(|args| args.split(','))
+            .filter_map(|arg| arg.trim().split_once('=').map(|(_, v)| v.trim()))
+            .filter(|value| !matches!(value.chars().next(), Some('"') | Some('\'')))
+            .for_each(|value| {
+                ContextManager::get()
+                    .update(|ctx| {
+                        if ctx.get(value).is_none() {
+                            ctx.insert(value, "");
+                        }
+                    })
+                    .unwrap_or_default();
+            });
+    }
+
     /// Adds default markers to all variables in the pattern
     ///
     /// # Arguments
@@ -48,6 +88,8 @@ impl TemplateRenderer {
             .replace_all(pattern, |caps: &regex::Captures| {
                 let content = caps.get(1).unwrap().as_str().trim();
                 if content.contains('|') {
+                    // Process filter arguments to add missing vars to context
+                    Self::process_filter_args(content);
                     // Has filters, insert default as first filter
                     format!(
                         "{{{{ {} | default(value='') | {} }}}}",
@@ -55,7 +97,7 @@ impl TemplateRenderer {
                         content
                             .split('|')
                             .skip(1)
-                            .collect::<Vec<&str>>()
+                            .collect::<Vec<_>>()
                             .join("|")
                             .trim()
                     )
@@ -113,10 +155,6 @@ impl TemplateRenderer {
     pub fn render(&self, pattern_data: &str) -> Result<String> {
         let pattern = Self::pre_process_pattern(pattern_data)?;
 
-        let mut tera = Tera::default();
-        tera.register_filter("color", color::create_color_filter());
-        tera.register_filter("style", style::create_style_filter());
-
         // Get template name and pattern first
         let template_name = {
             let ctx = ContextManager::get().read()?;
@@ -133,6 +171,9 @@ impl TemplateRenderer {
                 .replace(" ", "_")
         };
 
+        let mut tera = TERA
+            .lock()
+            .map_err(|e| Error::TemplateRenderError(e.to_string()))?;
         tera.add_raw_template(&template_name, &pattern)?;
 
         // Do the render with the context directly
