@@ -131,7 +131,6 @@ impl ColorManager {
             let r: u8 = safe_parse(groups.get(1).map_or("", |m| m.as_str()));
             let g: u8 = safe_parse(groups.get(2).map_or("", |m| m.as_str()));
             let b: u8 = safe_parse(groups.get(3).map_or("", |m| m.as_str()));
-            println!("r: {}, g: {}, b: {}", r, g, b);
             Some(Color::Rgb(r, g, b))
         } else if FNAME_REGEX.is_match(color_str) {
             let groups = FNAME_REGEX.captures(color_str).unwrap();

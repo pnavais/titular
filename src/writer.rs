@@ -24,11 +24,7 @@ pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 c2=\"$message_color\"\n\
                                 c3=\"$main_color\"\n\n\
                                 [pattern]\n\
-                                data = \"\"\"\\\n\
-                                {% filter style(fg_color=c) %}\\\n\
-                                      pad({{fb}}){{m | color(name=c2)}}pad({{fe | color(name=c3)}})\\\n\
-                                {% endfilter %}\\\n\
-                                \"\"\"\n";
+                                data = \"pad({{fb | color(name=c)}}){{m | color(name=c2)}}pad({{fe | color(name=c3)}})\"\n";
 
 pub struct TemplateWriter {}
 
