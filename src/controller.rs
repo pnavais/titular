@@ -1,7 +1,4 @@
-use std::{
-    io::{stdin, stdout, Write},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use crate::{
     config::MainConfig, context::Context, display, error::*, formatter::TemplateFormatter,
@@ -222,7 +219,8 @@ impl<'a> TemplatesController<'a> {
     /// # Returns
     /// Returns `Ok(())` if the template was opened successfully, `Err(Error)` if the template does not exist.
     pub fn open(&self, name: &str) -> Result<bool> {
-        let (path, template, _) = self.create_new_template(name, true)?;
+        let (path, template, _) =
+            TemplateWriter::create_new_template(name, true, &self.input_dir, self.config)?;
 
         if !path.is_empty() {
             match edit::edit_file(&template) {
@@ -299,52 +297,6 @@ impl<'a> TemplatesController<'a> {
         }
 
         Ok(true)
-    }
-
-    /// Creates a new template in the repository if not existing asking optionally
-    /// the user using a confirmation prompt.
-    ///
-    /// # Arguments
-    /// * `name` - The name of the template to create.
-    /// * `prompt_user` - Whether to prompt the user for confirmation.
-    ///
-    /// # Returns
-    /// Returns a tuple containing the template name, path, and a boolean indicating
-    /// whether the template was created or not.
-    fn create_new_template(
-        &self,
-        name: &str,
-        prompt_user: bool,
-    ) -> Result<(String, PathBuf, bool)> {
-        let path = TemplateWriter::get_template_file(name);
-        let template = self.input_dir.clone().join(&path);
-
-        let mut template_created = false;
-
-        if !template.exists() {
-            if prompt_user {
-                loop {
-                    let mut input = String::new();
-                    print!(
-                        "Template \"{}\" not found. Do you want to create it ? [Y/n] : ",
-                        Yellow.paint(name)
-                    );
-                    let _ = stdout().flush();
-                    stdin()
-                        .read_line(&mut input)
-                        .expect("error: unable to read user input");
-                    input = input.trim().to_lowercase();
-                    if input == "y" || input == "yes" || input.is_empty() {
-                        break;
-                    } else if input == "n" || input == "no" {
-                        return Ok(("".to_owned(), PathBuf::new(), false));
-                    }
-                }
-            }
-            TemplateWriter::write_new(&template, self.config)?;
-            template_created = true;
-        }
-        Ok((path, template, template_created))
     }
 
     /// Performs the rendering of the template using the template formatter.

@@ -1,5 +1,5 @@
 use crate::{
-    config::MainConfig, context::Context, error::*, reader::TemplateReader,
+    config::MainConfig, context::Context, debug, error::*, reader::TemplateReader,
     transforms::TransformManager, writer::TemplateWriter, DEFAULT_TEMPLATE_NAME,
 };
 use std::io::{stdout, Write};
@@ -64,7 +64,7 @@ impl<'a> TemplateFormatter<'a> {
         let template = self.input_dir.join(&path);
 
         if !template.exists() && template_name == DEFAULT_TEMPLATE_NAME {
-            println!("Recovering template");
+            debug!("Recovering template");
             TemplateWriter::write_new(&template, self.config)?;
         }
         #[cfg(feature = "fetcher")]

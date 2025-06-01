@@ -9,10 +9,10 @@ use nu_ansi_term::Color::Yellow;
 use crate::{config::MainConfig, error::*, DEFAULT_TEMPLATE_EXT};
 
 pub const DEFAULT_TEMPLATE: &str = "[details]\n\
-                                name    = \"Basic\"\n\
+                                name    = \"@name\"\n\
                                 version = \"1.0\"\n\
-                                author  = \"pnavais\"\n\
-                                url     = \"https://github.com/pnavais\"\n\n\
+                                author  = \"@author\"\n\
+                                url     = \"@url\"\n\n\
                                 [vars]\n\
                                 main_color = \"green\"\n\
                                 message_color = \"$main_color\"\n\
