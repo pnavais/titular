@@ -1,6 +1,7 @@
 use ansi_parser::{AnsiParser, Output};
 use console::{measure_text_width, strip_ansi_codes};
 use print_positions::print_positions;
+use unicode_general_category::{get_general_category, GeneralCategory};
 
 /// Defines how ANSI codes should be handled after truncation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,6 +14,58 @@ pub enum AnsiTruncateBehavior {
     NoModification,
 }
 
+/// Check if a string is visually empty (contains only control characters, ANSI codes, or other non-printable characters)
+///
+/// # Arguments
+/// * `s` - The string to check
+///
+/// # Returns
+/// `true` if the string is empty or contains only control characters, ANSI codes, or zero-width characters.
+/// `false` if the string contains any visible characters (including spaces, tabs, newlines).
+///
+/// # Examples
+/// ```
+/// use titular::string_utils::is_visually_empty;
+///
+/// assert!(is_visually_empty("")); // Empty string
+/// assert!(is_visually_empty("\x1b[31m\x1b[0m")); // Only ANSI codes
+/// assert!(is_visually_empty("\u{200B}")); // Zero-width space (format character)
+/// assert!(is_visually_empty("\u{FEFF}")); // Zero-width no-break space (format character)
+/// assert!(!is_visually_empty("   ")); // Spaces are visually present
+/// assert!(!is_visually_empty("\t\n")); // Tabs and newlines are visually present
+/// assert!(!is_visually_empty("Hello")); // Has visible text
+/// assert!(!is_visually_empty("\x1b[31mHello\x1b[0m")); // Has visible text with ANSI codes
+/// ```
+pub fn is_visually_empty(s: &str) -> bool {
+    // First strip ANSI codes
+    let stripped = strip_ansi_codes(s);
+    // Then check if what remains is empty or only contains control/format characters
+    stripped.chars().all(|c| {
+        // A character is visually empty if it's not whitespace AND it's a control/format character
+        !c.is_whitespace()
+            && matches!(
+                get_general_category(c),
+                GeneralCategory::Control
+                    | GeneralCategory::Format
+                    | GeneralCategory::Unassigned
+                    | GeneralCategory::PrivateUse
+                    | GeneralCategory::Surrogate
+            )
+    })
+}
+
+/// Prints a string with its raw ANSI codes
+///
+/// # Arguments
+/// * `title` - The title of the string
+/// * `text` - The string to print
+///
+/// # Examples
+/// ```
+/// use titular::string_utils::print_raw_ansi;
+///
+/// print_raw_ansi("Hello", "\x1b[31mHello\x1b[0m");
+/// ```
 pub fn print_raw_ansi(title: &str, text: &str) {
     println!("{}: [{}]", title, text.replace("\x1b", "\\x1b"));
 }
@@ -460,5 +513,44 @@ mod tests {
         let mut s = String::from("\x1b[1m\x1b[31mBold Red\x1b[32mGreen\x1b[0m");
         s.truncate_ansi_with(5, AnsiTruncateBehavior::PreserveRemaining);
         assert_eq!(s, "\x1b[1m\x1b[31mBold \x1b[32m\x1b[0m");
+    }
+
+    #[test]
+    fn test_is_visually_empty() {
+        // Test empty strings
+        assert!(is_visually_empty(""));
+        assert!(!is_visually_empty("   ")); // Spaces are visually present
+        assert!(!is_visually_empty("\t\n\r")); // Tabs and newlines are visually present
+
+        // Test ANSI codes
+        assert!(is_visually_empty("\x1b[31m\x1b[0m")); // Red color code
+        assert!(is_visually_empty("\x1b[1m\x1b[0m")); // Bold
+        assert!(is_visually_empty("\x1b[1;31m\x1b[0m")); // Bold red
+
+        // Test control characters
+        assert!(is_visually_empty("\u{200B}")); // Zero-width space
+        assert!(is_visually_empty("\u{FEFF}")); // Zero-width no-break space
+        assert!(is_visually_empty("\u{200D}")); // Zero-width joiner
+        assert!(is_visually_empty("\u{200C}")); // Zero-width non-joiner
+        assert!(is_visually_empty("\u{200E}")); // Left-to-right mark
+        assert!(is_visually_empty("\u{200F}")); // Right-to-left mark
+        assert!(is_visually_empty("\u{202A}")); // Left-to-right embedding
+        assert!(is_visually_empty("\u{202B}")); // Right-to-left embedding
+        assert!(is_visually_empty("\u{202C}")); // Pop directional formatting
+        assert!(is_visually_empty("\u{202D}")); // Left-to-right override
+        assert!(is_visually_empty("\u{202E}")); // Right-to-left override
+
+        // Test mixed control characters
+        assert!(is_visually_empty("\u{200B}\u{FEFF}\u{200D}"));
+        assert!(!is_visually_empty("\u{200B} \u{FEFF}\t\u{200D}\n")); // Mixed with whitespace
+
+        // Test non-empty strings
+        assert!(!is_visually_empty("Hello"));
+        assert!(!is_visually_empty("Hello World"));
+        assert!(!is_visually_empty("\x1b[31mHello\x1b[0m"));
+        assert!(!is_visually_empty("\x1b[31mHello World\x1b[0m"));
+        assert!(!is_visually_empty("Hello\u{200B}World")); // Zero-width space between text
+        assert!(!is_visually_empty("\u{200B}Hello\u{200B}")); // Zero-width space around text
+        assert!(!is_visually_empty("\x1b[31mHello\u{200B}World\x1b[0m")); // Mixed ANSI and control
     }
 }

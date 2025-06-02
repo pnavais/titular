@@ -3,6 +3,7 @@
 //! - `color` : Apply a color to the text
 //! - `style` : Apply a style to the text
 
+pub mod append;
 pub mod color;
 pub mod style;
 pub mod surround;
