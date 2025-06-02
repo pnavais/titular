@@ -5,3 +5,8 @@
 
 pub mod color;
 pub mod style;
+pub mod surround;
+
+pub use color::create_color_filter;
+pub use style::create_style_filter;
+pub use surround::create_surround_filter;
