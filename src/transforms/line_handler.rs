@@ -1,7 +1,5 @@
-use crate::context_manager::ContextManager;
-use crate::error::Result;
+use crate::prelude::*;
 use crate::term::TERM_SIZE;
-use crate::transforms::Transform;
 use console::Term;
 
 /// Handles line endings based on context flags

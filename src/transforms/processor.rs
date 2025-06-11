@@ -1,8 +1,6 @@
-use crate::context_manager::ContextManager;
-use crate::error::Result;
+use crate::prelude::*;
 use crate::string_utils::expand_to_visual_width;
 use crate::term::TERM_SIZE;
-use crate::transforms::Transform;
 use console::{measure_text_width, strip_ansi_codes};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -15,9 +13,15 @@ struct MatchedGroup {
     end: usize,
 }
 
-// Regex to match pad() calls, including nested ones and empty ones
-static PAD_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"pad\((?:((?:[^()]|\([^()]*\))*))?\)").unwrap());
+// Regex to match content between our non-visible markers
+static PAD_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(
+        r"{start}(.*?){end}",
+        start = regex::escape(&padding::START.to_string()),
+        end = regex::escape(&padding::END.to_string())
+    ))
+    .unwrap()
+});
 
 pub struct TextProcessor {
     get_width: Arc<Mutex<Box<dyn Fn() -> usize + Send + Sync>>>,
@@ -81,6 +85,7 @@ impl TextProcessor {
     /// ```
     /// use titular::transforms::Transform;
     /// use titular::transforms::TextProcessor;
+    /// use titular::constants::padding;
     /// use std::sync::Mutex;
     /// use std::sync::Arc;
     ///
@@ -88,10 +93,12 @@ impl TextProcessor {
     /// let processor = TextProcessor::new(Box::new(|| 20));
     ///
     /// // Test empty pad removal
-    /// assert_eq!(processor.transform("Hello pad() World").unwrap(), "Hello  World");
+    /// let input = format!("Hello {}{} World", padding::START, padding::END);
+    /// assert_eq!(processor.transform(&input).unwrap(), "Hello  World");
     ///
     /// // Test padding expansion
-    /// let result = processor.transform("Hello pad(→) World").unwrap();
+    /// let input = format!("Hello {}→{} World", padding::START, padding::END);
+    /// let result = processor.transform(&input).unwrap();
     /// assert!(result.starts_with("Hello →"));
     /// assert!(result.ends_with("World"));
     /// assert!(result.len() > "Hello → World".len());
@@ -99,10 +106,10 @@ impl TextProcessor {
     fn process_padding_line(&self, content: &str) -> String {
         let mut result = content.to_string();
 
-        // First remove all empty pad() calls
+        // First remove all empty padding groups from the string
         self.remove_empty_pads(&mut result);
 
-        // Then process any remaining padding groups
+        // Extract and process padding groups
         let (groups, text_without_pads) = self.extract_padding_groups(&result);
         if !groups.is_empty() {
             self.process_padding_groups(&mut result, groups, text_without_pads);
@@ -111,52 +118,88 @@ impl TextProcessor {
         result
     }
 
-    /// Removes all empty pad() calls from the given string.
-    /// This method modifies the string in place by removing any pad() calls
-    /// that have no content between the parentheses.
+    /// Removes all empty padding groups from the given string.
+    /// This method modifies the string in place by removing any padding groups
+    /// that have no content between the markers.
+    fn remove_empty_pads(&self, result: &mut String) {
+        // Use regex to find all padding groups
+        let pattern = format!(
+            r"{}(.*?){}",
+            regex::escape(&padding::START.to_string()),
+            regex::escape(&padding::END.to_string())
+        );
+        let re = Regex::new(&pattern).unwrap();
+
+        // First collect all matches that need to be removed
+        let to_remove: Vec<(usize, usize)> = re
+            .captures_iter(&result)
+            .filter_map(|cap| {
+                let matched = cap.get(0)?;
+                let content = cap.get(1)?;
+
+                // If the content is empty after stripping ANSI codes, mark for removal
+                if strip_ansi_codes(content.as_str()).is_empty() {
+                    Some((matched.start(), matched.end()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Then remove them in reverse order to maintain correct indices
+        for (start, end) in to_remove.into_iter().rev() {
+            result.replace_range(start..end, "");
+        }
+    }
+
+    /// Extract padding groups from the content and calculate their information
     ///
     /// # Arguments
-    /// * `result` - A mutable reference to the string to process. The string will be
-    ///             modified in place to remove all empty pad() calls.
+    /// * `content` - The content to process
     ///
-    /// # Examples
-    /// ```
-    /// use titular::transforms::Transform;
-    /// use titular::transforms::TextProcessor;
-    /// use std::sync::Mutex;
-    /// use std::sync::Arc;
-    ///
-    /// // Create a processor with a fixed width for testing
-    /// let processor = TextProcessor::new(Box::new(|| 20));
-    ///
-    /// // Test empty pad removal
-    /// assert_eq!(processor.transform("Hello pad() World").unwrap(), "Hello  World");
-    /// assert_eq!(processor.transform("pad() Hello pad() World").unwrap(), " Hello  World");
-    ///
-    /// // Test that non-empty pads are preserved
-    /// let result = processor.transform("Hello pad(→) pad() World").unwrap();
-    /// assert!(result.starts_with("Hello →"));
-    /// assert!(result.ends_with("World"));
-    /// ```
-    fn remove_empty_pads(&self, result: &mut String) {
-        PAD_PATTERN
-            .captures_iter(result)
+    /// # Returns
+    /// A tuple containing:
+    /// - Vector of padding group information
+    /// - Total occupied space (outside text + padding content)
+    fn extract_padding_groups(&self, content: &str) -> (Vec<MatchedGroup>, usize) {
+        let stripped_content = strip_ansi_codes(content);
+        let stripped_width = measure_text_width(&stripped_content);
+
+        let (groups, total_group_length) = PAD_PATTERN
+            .captures_iter(content) // Use original content for matching
             .filter_map(|cap| {
                 cap.get(0).and_then(|matched| {
-                    // If the content group is None or empty, this is an empty pad()
-                    if cap.get(1).map_or(true, |m| m.as_str().is_empty()) {
-                        Some((matched.start(), matched.end()))
-                    } else {
-                        None
-                    }
+                    // For empty pad(), content will be None
+                    let pad_content = cap.get(1).map_or("", |m| m.as_str()).to_string();
+
+                    // Get the stripped version of the matched group for width calculation
+                    let stripped_group = strip_ansi_codes(&content[matched.start()..matched.end()]);
+                    let group_length = measure_text_width(&stripped_group);
+
+                    // Include all groups, empty or not
+                    Some((
+                        MatchedGroup {
+                            content: pad_content,
+                            start: matched.start(),
+                            end: matched.end(),
+                        },
+                        group_length,
+                    ))
                 })
             })
-            .collect::<Vec<_>>() // Collect to avoid borrow issues
-            .into_iter()
-            .rev() // Process in reverse to maintain correct indices
-            .for_each(|(start, end)| {
-                result.replace_range(start..end, "");
-            });
+            .fold(
+                (Vec::new(), 0),
+                |(mut groups, total_group_length), (group, group_len)| {
+                    // Add all groups to the list
+                    groups.push(group);
+                    (groups, total_group_length + group_len)
+                },
+            );
+
+        // Calculate the width of the text without padding groups
+        let text_without_pads = stripped_width - total_group_length;
+
+        (groups, text_without_pads)
     }
 
     /// Process non-empty padding groups in the given string.
@@ -180,6 +223,7 @@ impl TextProcessor {
     /// ```
     /// use titular::transforms::Transform;
     /// use titular::transforms::TextProcessor;
+    /// use titular::constants::padding;
     /// use std::sync::Mutex;
     /// use std::sync::Arc;
     ///
@@ -187,7 +231,9 @@ impl TextProcessor {
     /// let processor = TextProcessor::new(Box::new(|| 20));
     ///
     /// // Test padding distribution
-    /// let result = processor.transform("Hello pad(→) pad(←) World").unwrap();
+    /// let input = format!("Hello {}→{} {}←{} World",
+    ///     padding::START, padding::END, padding::START, padding::END);
+    /// let result = processor.transform(&input).unwrap();
     /// assert!(result.starts_with("Hello →"));
     /// assert!(result.contains("←"));
     /// assert!(result.ends_with("World"));
@@ -250,6 +296,7 @@ impl TextProcessor {
     /// ```
     /// use titular::transforms::Transform;
     /// use titular::transforms::TextProcessor;
+    /// use titular::constants::padding;
     /// use std::sync::Mutex;
     /// use std::sync::Arc;
     ///
@@ -257,7 +304,8 @@ impl TextProcessor {
     /// let processor = TextProcessor::new(Box::new(|| 20));
     ///
     /// // Test ANSI code preservation
-    /// let result = processor.transform("pad(\x1b[31m→\x1b[0m)").unwrap();
+    /// let input = format!("{}\x1b[31m→\x1b[0m{}", padding::START, padding::END);
+    /// let result = processor.transform(&input).unwrap();
     /// assert!(result.starts_with("\x1b[31m"));
     /// assert!(result.ends_with("\x1b[0m"));
     /// assert!(result.len() > "\x1b[31m→\x1b[0m".len());
@@ -289,70 +337,6 @@ impl TextProcessor {
         // Replace the entire pad() structure with the expanded content
         result.replace_range(group.start..group.end, &final_content);
     }
-
-    /// Extract padding groups from the content and calculate their information
-    ///
-    /// # Arguments
-    /// * `content` - The content to process
-    ///
-    /// # Returns
-    /// A tuple containing:
-    /// - Vector of padding group information
-    /// - Total occupied space (outside text + padding content)
-    fn extract_padding_groups(&self, content: &str) -> (Vec<MatchedGroup>, usize) {
-        let stripped_content = strip_ansi_codes(content);
-        let stripped_width = measure_text_width(&stripped_content);
-
-        let (groups, total_group_length) = PAD_PATTERN
-            .captures_iter(content) // Use original content for matching
-            .filter_map(|cap| {
-                cap.get(0).and_then(|matched| {
-                    // For empty pad(), content will be None
-                    let pad_content = cap.get(1).map_or("", |m| m.as_str()).to_string();
-
-                    // Get the stripped version of the matched group for width calculation
-                    let stripped_group = strip_ansi_codes(&content[matched.start()..matched.end()]);
-                    let group_length = measure_text_width(&stripped_group);
-
-                    // Only include non-empty groups
-                    if !pad_content.is_empty() {
-                        Some((
-                            MatchedGroup {
-                                content: pad_content,
-                                start: matched.start(),
-                                end: matched.end(),
-                            },
-                            group_length,
-                        ))
-                    } else {
-                        // For empty pad(), just return the length for total calculation
-                        Some((
-                            MatchedGroup {
-                                content: String::new(),
-                                start: matched.start(),
-                                end: matched.end(),
-                            },
-                            0, // Empty pad() contributes 0 to the total length
-                        ))
-                    }
-                })
-            })
-            .fold(
-                (Vec::new(), 0),
-                |(mut groups, total_group_length), (group, group_len)| {
-                    // Only add non-empty groups to the list
-                    if !group.content.is_empty() {
-                        groups.push(group);
-                    }
-                    (groups, total_group_length + group_len)
-                },
-            );
-
-        // Calculate the width of the text without padding groups
-        let text_without_pads = stripped_width - total_group_length;
-
-        (groups, text_without_pads)
-    }
 }
 
 impl Transform for TextProcessor {
@@ -366,5 +350,181 @@ impl Transform for TextProcessor {
             });
         }
         Ok(self.process_padding(text))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_padding_groups_basic() {
+        let processor = TextProcessor::default();
+        let input = format!(
+            "{}hello{} world {}foo{}",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].content, "hello");
+        assert_eq!(groups[1].content, "foo");
+        assert_eq!(text_width, measure_text_width(" world "));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_empty() {
+        let processor = TextProcessor::default();
+        let input = format!("{}{}", padding::START, padding::END);
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(
+            groups.len(),
+            1,
+            "extract_padding_groups should extract all groups, including empty ones"
+        );
+        assert_eq!(
+            groups[0].content, "",
+            "empty group's content should be an empty string"
+        );
+        assert_eq!(
+            text_width, 0,
+            "text_width (outside text) should be zero (no text outside the group)"
+        );
+    }
+
+    #[test]
+    fn test_extract_padding_groups_with_ansi() {
+        let processor = TextProcessor::default();
+        let input = format!(
+            "{}\x1b[31mhello\x1b[0m{} \x1b[32mworld\x1b[0m {}foo{}",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].content, "\x1b[31mhello\x1b[0m");
+        assert_eq!(groups[1].content, "foo");
+        assert_eq!(text_width, measure_text_width(" world "));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_with_emoji() {
+        let processor = TextProcessor::default();
+        let input = format!(
+            "{}hello 🦀{} world {}foo{}",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].content, "hello 🦀");
+        assert_eq!(groups[1].content, "foo");
+        assert_eq!(text_width, measure_text_width(" world "));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_with_ansi_and_emoji() {
+        let processor = TextProcessor::default();
+        let input = format!(
+            "{}\x1b[31mhello 🦀\x1b[0m{} \x1b[32mworld\x1b[0m {}foo{}",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].content, "\x1b[31mhello 🦀\x1b[0m");
+        assert_eq!(groups[1].content, "foo");
+        assert_eq!(text_width, measure_text_width(" world "));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_no_markers() {
+        let processor = TextProcessor::default();
+        let input = "hello world";
+        let (groups, text_width) = processor.extract_padding_groups(input);
+        assert_eq!(groups.len(), 0);
+        assert_eq!(text_width, measure_text_width(input));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_unmatched_start() {
+        let processor = TextProcessor::default();
+        let input = format!("{}hello world", padding::START);
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 0);
+        assert_eq!(text_width, measure_text_width(&input));
+    }
+
+    #[test]
+    fn test_extract_padding_groups_unmatched_end() {
+        let processor = TextProcessor::default();
+        let input = format!("hello world{}", padding::END);
+        let (groups, text_width) = processor.extract_padding_groups(&input);
+        assert_eq!(groups.len(), 0);
+        assert_eq!(text_width, measure_text_width(&input));
+    }
+
+    #[test]
+    fn test_process_padding_line() {
+        let processor = TextProcessor::new(Box::new(|| 20));
+        let input = format!("Hello {}→{} World", padding::START, padding::END);
+        let result = processor.process_padding_line(&input);
+        assert!(result.starts_with("Hello →"));
+        assert!(result.ends_with("World"));
+        assert!(result.len() > "Hello → World".len());
+    }
+
+    #[test]
+    fn test_process_padding_line_with_ansi() {
+        let processor = TextProcessor::new(Box::new(|| 20));
+        let input = format!(
+            "Hello {}\x1b[31m→\x1b[0m{} World",
+            padding::START,
+            padding::END
+        );
+        let result = processor.process_padding_line(&input);
+        assert!(result.starts_with("Hello \x1b[31m→"));
+        assert!(result.ends_with("\x1b[0m World"));
+        assert!(result.len() > "Hello \x1b[31m→\x1b[0m World".len());
+    }
+
+    #[test]
+    fn test_remove_empty_pads() {
+        let processor = TextProcessor::default();
+        let mut input = format!(
+            "Hello {}{} World {}{} Test",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        processor.remove_empty_pads(&mut input);
+        assert_eq!(input, "Hello  World  Test");
+
+        // Test with non-empty padding
+        let mut input = format!(
+            "Hello {}content{} World {}{} Test",
+            padding::START,
+            padding::END,
+            padding::START,
+            padding::END
+        );
+        processor.remove_empty_pads(&mut input);
+        assert_eq!(
+            input,
+            format!(
+                "Hello {}content{} World  Test",
+                padding::START,
+                padding::END
+            )
+        );
     }
 }

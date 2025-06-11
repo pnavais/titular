@@ -1,5 +1,6 @@
+use crate::prelude::*;
 use crate::{
-    config::MainConfig, context::Context, debug, error::*, reader::TemplateReader,
+    config::MainConfig, context::Context, debug, reader::TemplateReader,
     transforms::TransformManager, writer::TemplateWriter, DEFAULT_TEMPLATE_NAME,
 };
 use std::io::{stdout, Write};

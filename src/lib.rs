@@ -27,6 +27,7 @@
 
 pub mod color_manager;
 pub mod config;
+pub mod constants;
 pub mod context;
 pub mod context_manager;
 pub mod controller;
@@ -66,3 +67,22 @@ pub const DEFAULT_TIME_FORMAT: &str = "%H:%M:%S";
 #[cfg(feature = "fetcher")]
 /// Default remote repository for templates
 pub const DEFAULT_REMOTE_REPO: &str = "github:pnavais/titular/templates";
+
+/// The titular prelude
+///
+/// This module re-exports the most commonly used items from titular.
+/// You can use it with `use titular::prelude::*;` to bring all common items into scope.
+pub mod prelude {
+    // Re-export commonly used traits
+    pub use crate::transforms::Transform;
+
+    // Re-export commonly used types
+    pub use crate::context_manager::ContextManager;
+    pub use crate::error::Result;
+
+    // Re-export commonly used constants
+    pub use crate::constants::padding;
+
+    // Re-export commonly used functions
+    pub use crate::string_utils::{expand_to_visual_width, is_visually_empty};
+}

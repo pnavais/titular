@@ -1,5 +1,4 @@
-use crate::error::Result;
-use crate::transforms::Transform;
+use crate::prelude::*;
 use ansi_parser::{AnsiParser, Output};
 use std::collections::VecDeque;
 

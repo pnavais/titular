@@ -24,7 +24,7 @@ pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 c2=\"$message_color\"\n\
                                 c3=\"$main_color\"\n\n\
                                 [pattern]\n\
-                                data = \"pad({{fb | color(name=c)}}){{m | color(name=c2)}}pad({{fe | color(name=c3)}})\"\n";
+                                data = \"{{ fb | color(name=c) | pad }}{{ m | color(name=c2) }}{{ fe | color(name=c3) | pad }}\"\n";
 
 pub struct TemplateWriter {}
 
