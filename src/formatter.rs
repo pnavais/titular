@@ -37,8 +37,8 @@ impl<'a> TemplateFormatter<'a> {
         // Update the context in a clean way
         crate::context_manager::ContextManager::get().update(|ctx| {
             ctx.append_from(context);
-            ctx.append(&template_payload.vars);
             ctx.append(&self.config.vars);
+            ctx.append(&template_payload.vars);
             ctx.store_object("template_config", template_payload);
         })?;
 
