@@ -2,13 +2,13 @@ use chrono::prelude::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
+use titular::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 
 #[cfg(feature = "fetcher")]
-use titular::DEFAULT_REMOTE_REPO;
 use titular::{
     config::{parse as config_parse, MainConfig},
+    constants::template::DEFAULT_REMOTE_REPO,
     error::*,
-    DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT,
 };
 
 use crate::directories::PROJECT_DIRS;

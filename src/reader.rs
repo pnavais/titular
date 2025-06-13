@@ -1,7 +1,8 @@
 use crate::{
     config::{parse as config_parse, TemplateConfig},
+    constants::template::DEFAULT_TEMPLATE_EXT,
     error::*,
-    log, DEFAULT_TEMPLATE_EXT,
+    log,
 };
 
 use nu_ansi_term::Color::Yellow;

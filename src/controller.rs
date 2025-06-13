@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use crate::{
-    config::MainConfig, context::Context, display, error::*, formatter::TemplateFormatter,
-    writer::TemplateWriter, DEFAULT_TEMPLATE_EXT,
+    config::MainConfig, constants::template::DEFAULT_TEMPLATE_EXT, context::Context, display,
+    error::*, formatter::TemplateFormatter, writer::TemplateWriter,
 };
 
 use crate::utils;

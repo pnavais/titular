@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use crate::{
-    config::MainConfig, context::Context, debug, reader::TemplateReader,
-    transforms::TransformManager, writer::TemplateWriter, DEFAULT_TEMPLATE_NAME,
+    config::MainConfig, constants::template::DEFAULT_TEMPLATE_NAME, context::Context, debug,
+    reader::TemplateReader, transforms::TransformManager, writer::TemplateWriter,
 };
 use std::io::{stdout, Write};
 
 #[cfg(feature = "fetcher")]
-use crate::{fetcher::TemplateFetcher, DEFAULT_REMOTE_REPO};
+use crate::{constants::template::DEFAULT_REMOTE_REPO, fetcher::TemplateFetcher};
 
 pub struct TemplateFormatter<'a> {
     input_dir: &'a std::path::PathBuf,

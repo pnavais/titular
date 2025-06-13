@@ -1,5 +1,5 @@
+use crate::constants::template::DEFAULT_TIME_FORMAT;
 use crate::error::*;
-use crate::DEFAULT_TIME_FORMAT;
 use chrono::{DateTime, Local};
 use nu_ansi_term::Color::{Blue, Yellow};
 use num;

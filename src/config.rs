@@ -9,14 +9,14 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json;
 
+use crate::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
+
+#[cfg(feature = "fetcher")]
+use crate::constants::template::DEFAULT_REMOTE_REPO;
+#[cfg(feature = "display")]
+use crate::constants::template::DEFAULT_THEME;
 use crate::error::*;
 use crate::utils::safe_time_format;
-#[cfg(feature = "fetcher")]
-use crate::DEFAULT_REMOTE_REPO;
-use crate::DEFAULT_TEMPLATE_NAME;
-#[cfg(feature = "display")]
-use crate::DEFAULT_THEME;
-use crate::DEFAULT_TIME_FORMAT;
 
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]

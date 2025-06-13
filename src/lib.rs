@@ -52,22 +52,6 @@ pub mod transforms;
 pub mod utils;
 pub mod writer;
 
-/// Default template file extension
-pub const DEFAULT_TEMPLATE_EXT: &str = ".tl";
-
-/// Default template name
-pub const DEFAULT_TEMPLATE_NAME: &str = "basic";
-
-/// Default theme for display
-pub const DEFAULT_THEME: &str = "base16-ocean.dark";
-
-/// Default time format
-pub const DEFAULT_TIME_FORMAT: &str = "%H:%M:%S";
-
-#[cfg(feature = "fetcher")]
-/// Default remote repository for templates
-pub const DEFAULT_REMOTE_REPO: &str = "github:pnavais/titular/templates";
-
 /// The titular prelude
 ///
 /// This module re-exports the most commonly used items from titular.

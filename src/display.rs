@@ -8,10 +8,9 @@ use std::io::IsTerminal;
 use std::str::FromStr;
 
 use crate::config::Display;
+use crate::constants::template::DEFAULT_THEME;
 use crate::context::Context;
 use crate::error::*;
-#[cfg(feature = "display")]
-use crate::DEFAULT_THEME;
 
 use pager::Pager;
 

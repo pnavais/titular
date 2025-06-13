@@ -6,11 +6,11 @@ use std::sync::Mutex;
 use tera::Tera;
 
 use crate::config::TemplateConfig;
+use crate::constants::template::DEFAULT_TIME_FORMAT;
 use crate::error::*;
 use crate::filters::{append, color, hide, pad, style, surround};
 use crate::prelude::*;
 use crate::utils::safe_time_format;
-use crate::DEFAULT_TIME_FORMAT;
 
 static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
 

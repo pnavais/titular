@@ -6,25 +6,11 @@ use std::{
 
 use nu_ansi_term::Color::Yellow;
 
-use crate::{config::MainConfig, error::*, DEFAULT_TEMPLATE_EXT};
-
-pub const DEFAULT_TEMPLATE: &str = "[details]\n\
-                                name    = \"@name\"\n\
-                                version = \"1.0\"\n\
-                                author  = \"@author\"\n\
-                                url     = \"@url\"\n\n\
-                                [vars]\n\
-                                main_color = \"green\"\n\
-                                message_color = \"$main_color\"\n\
-                                white=\"RGB(255,255,255)\"\n\
-                                f=\"*\"\n\
-                                fb=\"$f\"\n\
-                                fe=\"${f2:f}\"\n\
-                                c=\"$main_color\"\n\
-                                c2=\"$message_color\"\n\
-                                c3=\"$main_color\"\n\n\
-                                [pattern]\n\
-                                data = \"{{ fb | color(name=c) | pad }}{{ m | color(name=c2) }}{{ fe | color(name=c3) | pad }}\"\n";
+use crate::{
+    config::MainConfig,
+    constants::template::{DEFAULT_TEMPLATE, DEFAULT_TEMPLATE_EXT},
+    error::*,
+};
 
 pub struct TemplateWriter {}
 
