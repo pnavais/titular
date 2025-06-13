@@ -7,7 +7,7 @@ use tera::Tera;
 
 use crate::config::TemplateConfig;
 use crate::error::*;
-use crate::filters::{append, color, pad, style, surround};
+use crate::filters::{append, color, hide, pad, style, surround};
 use crate::prelude::*;
 use crate::utils::safe_time_format;
 use crate::DEFAULT_TIME_FORMAT;
@@ -21,6 +21,7 @@ static TERA: Lazy<Mutex<Tera>> = Lazy::new(|| {
     tera.register_filter("surround", surround::create_surround_filter());
     tera.register_filter("append", append::create_append_filter());
     tera.register_filter("pad", pad::create_pad_filter());
+    tera.register_filter("hide", hide::create_hide_filter());
     Mutex::new(tera)
 });
 
