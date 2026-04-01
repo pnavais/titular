@@ -1,25 +1,26 @@
 use crate::constants::template::DEFAULT_TIME_FORMAT;
-use crate::error::*;
+use crate::error::Result;
 use chrono::{DateTime, Local};
 use nu_ansi_term::Color::{Blue, Yellow};
 use num;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub const ROOT_PREFIX: &str = "\u{f115}";
 pub const ELEMENT_PREFIX: &str = "\u{ea7b}";
 
-/// Safely formats a DateTime using the provided format string.
+/// Safely formats a `DateTime` using the provided format string.
 /// If the format string is invalid, returns a default format (%H:%M:%S).
 ///
 /// # Arguments
 ///
-/// * `dt` - The DateTime to format
+/// * `dt` - The `DateTime` to format
 /// * `format` - The format string to use for time formatting
 ///
 /// # Returns
 ///
 /// A string containing the formatted time
+#[must_use]
 pub fn safe_time_format(dt: &DateTime<Local>, format: &str) -> String {
     // Parse the format string first to validate it
     let items: Vec<_> = chrono::format::strftime::StrftimeItems::new(format).collect();
@@ -32,8 +33,7 @@ pub fn safe_time_format(dt: &DateTime<Local>, format: &str) -> String {
         eprintln!(
             "{}",
             Yellow.paint(format!(
-                "WARNING: Invalid time format specified \"{}\"",
-                format
+                "WARNING: Invalid time format specified \"{format}\""
             ))
         );
         return dt.format(DEFAULT_TIME_FORMAT).to_string();
@@ -51,7 +51,16 @@ pub fn safe_time_format(dt: &DateTime<Local>, format: &str) -> String {
 ///
 /// # Returns
 ///
-/// A string representing the number of bytes in a human-readable format
+/// A string representing the number of bytes in a human-readable format.
+/// Values shown as KB, MB, or GB use **up to three** fractional digits (trailing zeros
+/// dropped after the decimal point); exact multiples show `.0`. Byte counts under 1 KiB
+/// are plain integers with a `B` suffix.
+///
+/// Rounding uses integer math in `u128` (scaled by 1000, nearest thousandth of the
+/// chosen unit) so every `u64` is exact—no `f64` cast. This matches the idea of C’s
+/// `printf("%.3g", …)`-style trimming for the fractional part, but `format!` has no
+/// single specifier for that on integers; it is built explicitly here (compare C `printf`
+/// with three fractional digits, then stripping trailing zeros from the decimal part).
 ///
 /// # Examples
 ///
@@ -59,22 +68,40 @@ pub fn safe_time_format(dt: &DateTime<Local>, format: &str) -> String {
 /// use titular::utils::format_bytes;
 ///
 /// assert_eq!(format_bytes(1024), "1.0 KB");
+/// assert_eq!(format_bytes(1025), "1.001 KB");
 /// assert_eq!(format_bytes(1024 * 1024), "1.0 MB");
 /// assert_eq!(format_bytes(1024 * 1024 * 1024), "1.0 GB");
 /// ```
+#[must_use]
 pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
 
+    /// `bytes / unit` rounded to the nearest thousandth, then printed with at most three
+    /// fractional digits (trailing zeros removed).
+    fn fmt_scaled(bytes: u64, unit: u64, suffix: &str) -> String {
+        let b = u128::from(bytes);
+        let u = u128::from(unit);
+        let scaled = (b * 1000 + u / 2) / u;
+        let whole = scaled / 1000;
+        let frac = scaled % 1000;
+        if frac == 0 {
+            return format!("{whole}.0 {suffix}");
+        }
+        let frac_part = format!("{frac:03}");
+        let frac_trimmed = frac_part.trim_end_matches('0');
+        format!("{whole}.{frac_trimmed} {suffix}")
+    }
+
     if bytes >= GB {
-        format!("{:.1} GB", bytes as f64 / GB as f64)
+        fmt_scaled(bytes, GB, "GB")
     } else if bytes >= MB {
-        format!("{:.1} MB", bytes as f64 / MB as f64)
+        fmt_scaled(bytes, MB, "MB")
     } else if bytes >= KB {
-        format!("{:.1} KB", bytes as f64 / KB as f64)
+        fmt_scaled(bytes, KB, "KB")
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
@@ -96,6 +123,7 @@ pub fn cleanup() {
 ///
 /// # Returns
 /// `true` if the command exists and is executable, `false` otherwise
+#[must_use]
 pub fn command_exists(cmd: &str) -> bool {
     if cfg!(target_os = "windows") {
         Command::new("where")
@@ -183,7 +211,7 @@ pub fn print_tree_with_prefixes<T: AsRef<str>, F, G>(
     G: Fn(&str) -> String,
 {
     let num_items = items.len();
-    if num_items >= 1 {
+    if let Some((last, rest)) = items.split_last() {
         let header = format!(
             "Found {} {}{}\n",
             num_items,
@@ -192,9 +220,7 @@ pub fn print_tree_with_prefixes<T: AsRef<str>, F, G>(
         );
 
         println!("{}", header_formatter(&header));
-        println!("{}", root_formatter(&format!("{} {}", root_prefix, root)));
-        // Handle all but the last file
-        let (last, rest) = items.split_last().unwrap();
+        println!("{}", root_formatter(&format!("{root_prefix} {root}")));
 
         for item in rest {
             println!("├── {} {}", element_prefix, item.as_ref());
@@ -202,10 +228,7 @@ pub fn print_tree_with_prefixes<T: AsRef<str>, F, G>(
 
         println!("└── {} {}", element_prefix, last.as_ref());
     } else {
-        println!(
-            "{}",
-            header_formatter(&format!("No {}s found", element_name))
-        );
+        println!("{}", header_formatter(&format!("No {element_name}s found")));
     }
 }
 
@@ -217,9 +240,12 @@ pub fn print_tree_with_prefixes<T: AsRef<str>, F, G>(
 ///
 /// # Returns
 /// Returns a Result indicating success or failure.
+///
+/// # Errors
+/// Returns an error if the file cannot be renamed.
 pub fn create_backup(path: &PathBuf) -> Result<()> {
     let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
-        path.with_extension(format!("{}.bak", ext))
+        path.with_extension(format!("{ext}.bak"))
     } else {
         path.with_extension("bak")
     };
@@ -234,9 +260,12 @@ pub fn create_backup(path: &PathBuf) -> Result<()> {
 ///
 /// # Returns
 /// Returns a Result indicating success or failure.
+///
+/// # Errors
+/// Returns an error if the backup cannot be renamed onto the original path.
 pub fn restore_backup(path: &PathBuf) -> Result<()> {
     let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
-        path.with_extension(format!("{}.bak", ext))
+        path.with_extension(format!("{ext}.bak"))
     } else {
         path.with_extension("bak")
     };
@@ -253,9 +282,12 @@ pub fn restore_backup(path: &PathBuf) -> Result<()> {
 ///
 /// # Returns
 /// Returns a Result indicating success or failure.
-pub fn remove_backup(path: &PathBuf) -> Result<()> {
+///
+/// # Errors
+/// Returns an error if the backup file cannot be removed.
+pub fn remove_backup(path: &Path) -> Result<()> {
     let backup_path = if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
-        path.with_extension(format!("{}.bak", ext))
+        path.with_extension(format!("{ext}.bak"))
     } else {
         path.with_extension("bak")
     };
@@ -288,6 +320,7 @@ pub fn remove_backup(path: &PathBuf) -> Result<()> {
 /// assert_eq!(safe_parse::<i8>("-128"), -128);
 /// assert_eq!(safe_parse::<i8>("-129"), -128); // Clamped to i8::MIN
 /// ```
+#[must_use]
 pub fn safe_parse<T>(s: &str) -> T
 where
     T: std::str::FromStr
@@ -368,13 +401,15 @@ mod tests {
 
         // Test kilobytes
         assert_eq!(format_bytes(1024), "1.0 KB");
-        assert_eq!(format_bytes(1536), "1.5 KB"); // 1.5 KB
-        assert_eq!(format_bytes(1024 * 1024 - 1), "1024.0 KB"); // Just under 1 MB
+        assert_eq!(format_bytes(1025), "1.001 KB");
+        assert_eq!(format_bytes(1536), "1.5 KB");
+        assert_eq!(format_bytes(1024 * 1024 - 1), "1023.999 KB"); // Just under 1 MB
 
         // Test megabytes
         assert_eq!(format_bytes(1024 * 1024), "1.0 MB");
         assert_eq!(format_bytes(1024 * 1024 * 2), "2.0 MB");
-        assert_eq!(format_bytes(1024 * 1024 * 1024 - 1), "1024.0 MB"); // Just under 1 GB
+        // Rounds up to 1024.0 at three decimal places (just under 1 GiB in MiB)
+        assert_eq!(format_bytes(1024 * 1024 * 1024 - 1), "1024.0 MB");
 
         // Test gigabytes
         assert_eq!(format_bytes(1024 * 1024 * 1024), "1.0 GB");

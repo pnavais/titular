@@ -1,6 +1,5 @@
 use crate::utils::safe_parse;
-use nu_ansi_term::{Color, Color::*, Style};
-use once_cell::sync::Lazy;
+use nu_ansi_term::{Color, Color::{Fixed, Black, Red, Green, Yellow, Blue, Purple, Cyan, White}, Style};
 use regex::Regex;
 use std::collections::HashSet;
 
@@ -20,12 +19,12 @@ pub struct StyleFormat {
     pub scope: StyleScope,
 }
 
-static RGB_REGEX: Lazy<Regex> = Lazy::new(|| {
+static RGB_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new("(?i)^RGB\\([\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*\\)$")
         .unwrap()
 });
 
-static FNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
+static FNAME_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new("(?i)^((FIXED)\\([\\s]*([0-9]+)[\\s]*\\)|(NAME)\\([\\s]*([[:alpha:]]+)[\\s]*\\))$")
         .unwrap()
 });
@@ -45,6 +44,7 @@ impl ColorManager {
     /// # Returns
     ///
     /// A string with the color applied
+    #[must_use] 
     pub fn format(colours: &Context, txt: &str, style: StyleFormat) -> String {
         let mut style_obj = Style::new();
 
@@ -65,7 +65,7 @@ impl ColorManager {
     }
 
     /// Process the colour style supplied in one of the following variants supported by the
-    /// ansi_term crate :
+    /// `ansi_term` crate :
     /// - RGB(r,g,b) : A colour specified using the RGB notation
     /// - FIXED(num) : A colour specified in fixed terms
     /// - NAME(name) : The name of the colour
@@ -153,7 +153,7 @@ impl ColorManager {
         }
     }
 
-    /// List of colours supported by the ansi_term crate
+    /// List of colours supported by the `ansi_term` crate
     ///
     /// # Arguments
     ///

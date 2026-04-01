@@ -64,13 +64,11 @@ impl Dispatcher for GitHubDispatcher {
         // Construct the GitHub API content URL
         let api_url = if let Some(branch) = branch {
             format!(
-                "https://api.github.com/repos/{}/{}/contents/{}?ref={}",
-                owner, repo, path, branch
+                "https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={branch}"
             )
         } else {
             format!(
-                "https://api.github.com/repos/{}/{}/contents/{}",
-                owner, repo, path
+                "https://api.github.com/repos/{owner}/{repo}/contents/{path}"
             )
         };
 
@@ -128,9 +126,9 @@ impl GitHubDispatcher {
             } else {
                 // Insert /templates before any query parameters
                 if query.is_empty() {
-                    format!("{}/templates", base_url)
+                    format!("{base_url}/templates")
                 } else {
-                    format!("{}/templates?{}", base_url, query)
+                    format!("{base_url}/templates?{query}")
                 }
             };
 
@@ -162,8 +160,11 @@ impl GitHubDispatcher {
         if let Value::Array(items) = json {
             for item in items {
                 if let Some(path) = item.get("path").and_then(|p| p.as_str()) {
-                    // Only add files that end with .tl extension
-                    if path.ends_with(".tl") {
+                    // Only add files that end with .tl extension (case-insensitive)
+                    if std::path::Path::new(path)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("tl"))
+                    {
                         if let Some(download_url) =
                             item.get("download_url").and_then(|p| p.as_str())
                         {

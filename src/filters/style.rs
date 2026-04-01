@@ -7,7 +7,7 @@ use crate::context_manager::ContextManager;
 /// Create a style filter closure for Tera
 ///
 /// # Returns
-/// A closure that can be used with Tera's register_filter
+/// A closure that can be used with Tera's `register_filter`
 pub fn create_style_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Result<Value, TeraError>
 {
     move |value: &Value, args: &HashMap<String, Value>| {

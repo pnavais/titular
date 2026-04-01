@@ -11,7 +11,7 @@ use crate::config::Display;
 #[cfg(feature = "display")]
 use crate::constants::template::DEFAULT_THEME;
 use crate::context::Context;
-use crate::error::*;
+use crate::error::Result;
 
 use pager::Pager;
 
@@ -32,7 +32,7 @@ use crate::utils::command_exists;
 /// Setups the pager to display the content in a terminal.
 ///
 /// Sets up a pager if the content exceeds terminal height and we're in a terminal.
-/// Uses TITULAR_PAGER or BAT_PAGER environment variables if defined.
+/// Uses `TITULAR_PAGER` or `BAT_PAGER` environment variables if defined.
 ///
 /// # Returns
 /// Whenever the display feature is enabled, and the content is less than the terminal height,
@@ -122,8 +122,7 @@ fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
     let theme_name = ctx
         .get("theme")
         .or_else(|| ctx.get("defaults.display_theme"))
-        .map(|s| s as &str)
-        .unwrap_or(DEFAULT_THEME);
+        .map_or(DEFAULT_THEME, |s| s as &str);
 
     let theme = theme_manager
         .theme_set
@@ -143,7 +142,7 @@ fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
     for line in LinesWithEndings::from(content) {
         let regions = h.highlight_line(line, &syntax_set).unwrap();
         let escaped = as_24_bit_terminal_escaped(&regions[..], false);
-        print!("{}", escaped);
+        print!("{escaped}");
     }
 
     Ok(())
@@ -157,6 +156,9 @@ fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
 ///
 /// # Returns
 /// A `Result` indicating success or failure.
+///
+/// # Errors
+/// Returns an error if the file cannot be read, display mode is invalid, or output fails.
 #[cfg(feature = "display")]
 pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     // Load the template content
@@ -165,7 +167,7 @@ pub fn display_template(path: &Path, context: &Context) -> Result<()> {
         context
             .get("mode")
             .or_else(|| context.get("defaults.display"))
-            .unwrap_or(&"raw".to_string()),
+            .unwrap_or("raw"),
     )?;
 
     // Setup pager if needed
@@ -178,7 +180,7 @@ pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     // Display content based on display type
     match display {
         Display::Fancy => display_fancy(&file_content, context)?,
-        _ => writeln!(io::stdout().lock(), "{}", file_content)?,
+        _ => writeln!(io::stdout().lock(), "{file_content}")?,
     }
 
     Ok(())
@@ -193,13 +195,16 @@ pub fn display_template(path: &Path, context: &Context) -> Result<()> {
 ///
 /// # Returns
 /// A `Result` indicating success or failure.
+///
+/// # Errors
+/// Returns an error if the file cannot be read, pager setup fails, or writing to stdout fails.
 #[cfg(not(feature = "display"))]
 pub fn display_template(path: &Path, context: &Context) -> Result<()> {
-    let content = fs::read_to_string(path)?;
+    let file_content = fs::read_to_string(path)?;
 
     check_pager(context, path)?;
 
-    writeln!(io::stdout().lock(), "{}", content)?;
+    writeln!(io::stdout().lock(), "{file_content}")?;
 
     Ok(())
 }

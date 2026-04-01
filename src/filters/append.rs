@@ -31,7 +31,7 @@ pub fn create_append_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Res
                 .and_then(|v| v.as_str())
                 .filter(|s| !is_visually_empty(s))
                 .unwrap_or("");
-            format!("{}{}", text, append_text)
+            format!("{text}{append_text}")
         }))
     }
 }

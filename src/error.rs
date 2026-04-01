@@ -146,5 +146,5 @@ pub fn default_error_handler(error: &Error, output: &mut dyn Write) {
         _ => {
             writeln!(output, "{}: {}", Red.paint("[titular error]"), error).ok();
         }
-    };
+    }
 }

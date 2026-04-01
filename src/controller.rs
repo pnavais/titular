@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     config::MainConfig, constants::template::DEFAULT_TEMPLATE_EXT, context::Context, display,
-    error::*, formatter::TemplateFormatter, writer::TemplateWriter,
+    error::{Error, Result}, formatter::TemplateFormatter, writer::TemplateWriter,
 };
 
 use crate::utils;
@@ -24,6 +24,7 @@ pub struct TemplatesController<'a> {
 /// Provides all the operations involving templates management (list, open, create, edit, add (when "fetcher" feature enabled))
 /// and formatting/rendering.
 impl<'a> TemplatesController<'a> {
+    #[must_use] 
     pub fn new(input_dir: PathBuf, config: &'a MainConfig) -> Self {
         Self { input_dir, config }
     }
@@ -41,6 +42,9 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure.
+    ///
+    /// # Errors
+    /// Returns an error if the subcommand is missing, invalid, or an underlying operation fails.
     pub fn run_template_subcommand(&self, context: &Context) -> Result<bool> {
         match context.get("subcommand") {
             Some(cmd) => match cmd {
@@ -103,6 +107,10 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
+    ///
+    /// # Errors
+    /// Returns an error if listing themes or templates fails.
+    ///
     /// # Examples
     /// ```
     /// use std::path::PathBuf;
@@ -119,6 +127,7 @@ impl<'a> TemplatesController<'a> {
     /// let result = controller.list();
     ///
     /// assert!(result.is_ok());
+    /// ```
     #[cfg(feature = "display")]
     pub fn list(&self, context: &Context) -> Result<bool> {
         if context.is_active("themes") {
@@ -127,6 +136,8 @@ impl<'a> TemplatesController<'a> {
         self.list_templates()
     }
 
+    /// # Errors
+    /// Returns an error if listing templates fails.
     #[cfg(not(feature = "display"))]
     pub fn list(&self) -> Result<bool> {
         self.list_templates()
@@ -138,6 +149,9 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
+    ///
+    /// # Errors
+    /// Returns an error if themes cannot be loaded or listed.
     #[cfg(feature = "display")]
     pub fn list_themes(&self) -> Result<bool> {
         ThemeManager::init()?.list_themes()?;
@@ -150,26 +164,28 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
+    ///
+    /// # Errors
+    /// Returns an error if the glob pattern is invalid or a matched path cannot be read.
     pub fn list_templates(&self) -> Result<bool> {
         if self.input_dir.exists() {
-            let templates = glob(&format!(
+            let pattern = format!(
                 "{}{}{}",
                 self.input_dir.to_string_lossy(),
                 "/**/*",
                 DEFAULT_TEMPLATE_EXT
-            ))
-            .expect("Failed to read glob pattern");
-
-            let files: Vec<String> = templates
-                .map(|t| {
-                    t.unwrap()
-                        .file_name()
-                        .unwrap()
-                        .to_owned()
-                        .into_string()
-                        .unwrap()
-                })
-                .collect();
+            );
+            let mut files = Vec::new();
+            for entry in glob(&pattern)
+                .map_err(|e| Error::Msg(format!("Invalid glob pattern: {e}")))?
+            {
+                let path = entry.map_err(|e| Error::Msg(format!("Glob iteration error: {e}")))?;
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .ok_or_else(|| Error::Msg("Non-UTF-8 or missing file name in template path".to_string()))?;
+                files.push(name.to_string());
+            }
 
             let root = self.input_dir.to_string_lossy().to_string();
             utils::print_tree(&files, "template", &root);
@@ -194,6 +210,9 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// Returns `Ok(true)` if the template was created successfully, `Ok(false)` if the template already exists.
+    ///
+    /// # Errors
+    /// Returns an error if the template file cannot be written.
     pub fn create(&self, name: &str) -> Result<bool> {
         let (_, _, created) =
             TemplateWriter::create_new_template(name, false, &self.input_dir, self.config)?;
@@ -202,7 +221,7 @@ impl<'a> TemplatesController<'a> {
         } else {
             println!(
                 "{}",
-                Yellow.paint(format!("Template \"{}\" already exists", name))
+                Yellow.paint(format!("Template \"{name}\" already exists"))
             );
         }
         Ok(created)
@@ -215,20 +234,23 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// Returns `Ok(())` if the template was opened successfully, `Err(Error)` if the template does not exist.
+    ///
+    /// # Errors
+    /// Returns an error if creating or opening the template fails.
     pub fn open(&self, name: &str) -> Result<bool> {
         let (path, template, _) =
             TemplateWriter::create_new_template(name, true, &self.input_dir, self.config)?;
 
-        if !path.is_empty() {
+        if path.is_empty() {
+            Ok(true)
+        } else {
             match edit::edit_file(&template) {
-                Ok(_) => Ok(true),
+                Ok(()) => Ok(true),
                 Err(e) => Err(Error::TemplateReadError {
                     file: path,
                     cause: e.to_string(),
                 }),
             }
-        } else {
-            Ok(true)
         }
     }
 
@@ -239,13 +261,16 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// Returns `Ok(())` if the template was removed successfully, `Err(Error)` if the template does not exist.
+    ///
+    /// # Errors
+    /// Returns an error if the template file cannot be removed.
     pub fn remove(&self, name: &str) -> Result<bool> {
         let path = TemplateWriter::get_template_file(name);
         let template = self.input_dir.clone().join(&path);
 
         if template.exists() {
             match std::fs::remove_file(template) {
-                Ok(_) => println!("Template \"{}\" removed", Green.paint(name)),
+                Ok(()) => println!("Template \"{}\" removed", Green.paint(name)),
                 Err(e) => {
                     return Err(Error::TemplateReadError {
                         file: path,
@@ -256,7 +281,7 @@ impl<'a> TemplatesController<'a> {
         } else {
             println!(
                 "{}",
-                Yellow.paint(format!("Template \"{}\" not found", name))
+                Yellow.paint(format!("Template \"{name}\" not found"))
             );
         }
 
@@ -271,6 +296,9 @@ impl<'a> TemplatesController<'a> {
     /// # Returns
     /// Returns `Ok(())` if the template was displayed successfully,
     /// `Err(Error)` if the template does not exist.
+    ///
+    /// # Errors
+    /// Returns an error if the template cannot be read or rendered.
     pub fn display(&self, name: &str, context: &Context) -> Result<bool> {
         let path = TemplateWriter::get_template_file(name);
         let template = self.input_dir.clone().join(&path);
@@ -280,7 +308,7 @@ impl<'a> TemplatesController<'a> {
             let mut context_map = Context::from(&self.config.vars);
             context_map.append_from(context);
             return match display::display_template(&template, &context_map) {
-                Ok(_) => Ok(true),
+                Ok(()) => Ok(true),
                 Err(e) => Err(Error::TemplateReadError {
                     file: path,
                     cause: e.to_string(),
@@ -289,7 +317,7 @@ impl<'a> TemplatesController<'a> {
         }
         println!(
             "{}",
-            Yellow.paint(format!("Template \"{}\" not found", name))
+            Yellow.paint(format!("Template \"{name}\" not found"))
         );
         Ok(true)
     }
@@ -304,6 +332,9 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// Returns `Ok(true)` if the template was rendered successfully, `Err(Error)` if the template does not exist.
+    ///
+    /// # Errors
+    /// Returns an error if preprocessing, reading, or rendering the template fails.
     pub fn format(&self, context: &Context, template_name: &str) -> Result<bool> {
         TemplateFormatter::new(&self.input_dir, self.config).format(context, template_name)
     }

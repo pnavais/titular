@@ -12,6 +12,9 @@ pub trait Dispatcher {
     ///
     /// # Returns
     /// A `Result` containing a vector of URLs to fetch or an error
+    ///
+    /// # Errors
+    /// Returns an error if the URL scheme is unsupported or the URL list is invalid.
     fn process(url: &str) -> Result<Vec<String>>;
 }
 
@@ -71,8 +74,7 @@ impl Dispatcher for URLDispatcher {
             Some((scheme, _)) => Err(Error::TemplateDownloadError(
                 url.to_string(),
                 format!(
-                    "URL scheme '{}' is not supported. Only github:, http://, and https:// are supported.",
-                    scheme
+                    "URL scheme '{scheme}' is not supported. Only github:, http://, and https:// are supported."
                 ),
             )),
             None => Err(Error::TemplateDownloadError(

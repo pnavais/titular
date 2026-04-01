@@ -12,12 +12,13 @@ impl Default for LineHandler {
 }
 
 impl LineHandler {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
 }
 
-/// LineHandler is a transform that handles line manipulations based on context flags.
+/// `LineHandler` is a transform that handles line manipulations based on context flags.
 /// For example, it can be used to skip the newline character at the end of the text.
 /// When clear is active, it will move to the beginning of the line and clear it.
 impl Transform for LineHandler {

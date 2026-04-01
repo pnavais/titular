@@ -4,7 +4,7 @@ use tera::{Error as TeraError, Value};
 /// Get the last exit code from the shell
 ///
 /// # Arguments
-/// * `_args` - A HashMap containing the function arguments (not used)
+/// * `_args` - A `HashMap` containing the function arguments (not used)
 ///
 /// # Returns
 /// A Tera Value containing the last exit code as a number
@@ -17,6 +17,10 @@ use tera::{Error as TeraError, Value};
 ///     Command failed with code {{ get_last_exit_code() }}
 /// {% endif %}
 /// ```
+///
+/// # Errors
+/// Returns a Tera error if `LAST_EXIT_CODE` or `?` is set but cannot be parsed as an integer.
+#[allow(clippy::implicit_hasher)] // Signature must match Tera's function handler type
 pub fn get_last_exit_code(_args: &HashMap<String, Value>) -> Result<Value, TeraError> {
     // Get the last exit code from the environment
     let exit_code = std::env::var("LAST_EXIT_CODE")

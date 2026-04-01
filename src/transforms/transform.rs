@@ -36,5 +36,8 @@ pub trait Transform: Send + Sync {
     /// let result = formatter.transform("Hello").unwrap();
     /// assert_eq!(result, "Hello");
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if the transform cannot be applied (e.g. missing context or invalid input).
     fn transform(&self, text: &str) -> Result<String>;
 }

@@ -6,7 +6,7 @@ use tera::{Error as TeraError, Value};
 /// Type alias for a function that provides an optional string value
 pub type ValueProviderFn = fn(&str) -> std::result::Result<Option<String>, TeraError>;
 
-/// Default function that gets a value from ContextManager
+/// Default function that gets a value from `ContextManager`
 fn default_value_provider(key: &str) -> std::result::Result<Option<String>, TeraError> {
     let ctx = ContextManager::get()
         .read()
@@ -23,14 +23,15 @@ pub fn create_surround_filter(
 /// Create a surround filter closure for Tera with a custom value provider
 ///
 /// # Arguments
-/// * `value_provider` - Function that provides a string value for a given key. Defaults to using ContextManager if None.
+/// * `value_provider` - Function that provides a string value for a given key. Defaults to using `ContextManager` if None.
 ///
 /// # Returns
 /// A filter that surrounds the input text with start and end strings if the text is not visually empty.
 /// The strings are obtained from:
-/// 1. The primary key (surround_start/end) if available
-/// 2. The defaults key (defaults.surround_start/end) as fallback
+/// 1. The primary key (`surround_start/end`) if available
+/// 2. The defaults key (`defaults.surround_start/end`) as fallback
 /// 3. An empty string if neither is available
+///
 /// If the input text is visually empty (contains only whitespace, ANSI codes, or other non-printable characters),
 /// it is returned unchanged.
 pub fn create_surround_filter_with(
@@ -49,7 +50,7 @@ pub fn create_surround_filter_with(
             let end = get_value("surround_end")?
                 .or(get_value("defaults.surround_end")?)
                 .unwrap_or_default();
-            format!("{}{}{}", start, text, end)
+            format!("{start}{text}{end}")
         }))
     }
 }

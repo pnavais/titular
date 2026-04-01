@@ -36,6 +36,7 @@ pub enum AnsiTruncateBehavior {
 /// assert!(!is_visually_empty("Hello")); // Has visible text
 /// assert!(!is_visually_empty("\x1b[31mHello\x1b[0m")); // Has visible text with ANSI codes
 /// ```
+#[must_use] 
 pub fn is_visually_empty(s: &str) -> bool {
     // First strip ANSI codes
     let stripped = strip_ansi_codes(s);
@@ -67,7 +68,7 @@ pub fn is_visually_empty(s: &str) -> bool {
 /// print_raw_ansi("Hello", "\x1b[31mHello\x1b[0m");
 /// ```
 pub fn print_raw_ansi(title: &str, text: &str) {
-    println!("{}: [{}]", title, text.replace("\x1b", "\\x1b"));
+    println!("{}: [{}]", title, text.replace('\x1b', "\\x1b"));
 }
 
 /// Expands a string to a target width by repeating its content.
@@ -93,6 +94,7 @@ pub fn print_raw_ansi(title: &str, text: &str) {
 /// assert_eq!(expand_to_width("🦀", 2), "🦀🦀");
 /// assert_eq!(expand_to_width("🦀🌟", 3), "🦀🌟🦀");
 /// ```
+#[must_use] 
 pub fn expand_to_width(input: &str, target_width: usize) -> String {
     // Collect the "print positions" (user-visible glyphs, including ANSI)
     let positions: Vec<&str> = print_positions(input)
@@ -150,6 +152,7 @@ pub fn expand_to_width(input: &str, target_width: usize) -> String {
 /// assert_eq!(expand_to_visual_width("📦", 4), "📦📦"); // Each emoji is 2 units wide
 /// assert_eq!(expand_to_visual_width("📦🌟", 6), "📦🌟📦"); // Each emoji is 2 units wide
 /// ```
+#[must_use] 
 pub fn expand_to_visual_width(input: &str, target_width: usize) -> String {
     // If input is empty, return as is
     if input.is_empty() {
@@ -190,7 +193,7 @@ pub trait Truncate {
     /// # Arguments
     /// * `width` - The maximum width in characters
     fn truncate_ansi(&mut self, width: usize) {
-        self.truncate_ansi_with(width, AnsiTruncateBehavior::NoModification)
+        self.truncate_ansi_with(width, AnsiTruncateBehavior::NoModification);
     }
 
     /// Truncates a string to the specified width with configurable ANSI code handling
@@ -238,7 +241,7 @@ impl Truncate for String {
                 if let Some(end) = self[current_pos..].find('m') {
                     // Only include ANSI codes that come before our truncation point
                     if current_width < width {
-                        let ansi_seq = &self[current_pos..current_pos + end + 1];
+                        let ansi_seq = &self[current_pos..=(current_pos + end)];
                         result.push_str(ansi_seq);
                     }
                     current_pos += end + 1;
@@ -286,7 +289,7 @@ fn process_ansi_escapes(truncated: &str, original: &str, behavior: AnsiTruncateB
                 .ansi_parse()
                 .filter_map(|block| match block {
                     Output::Escape(seq) => Some(seq.to_string()),
-                    _ => None,
+                    Output::TextBlock(_) => None,
                 })
                 .collect();
 

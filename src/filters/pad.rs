@@ -9,10 +9,10 @@ use tera::{Error as TeraError, Value};
 ///
 /// # Arguments
 /// * `value` - The input string to process
-/// * `args` - A HashMap containing the filter arguments (not used yet)
+/// * `args` - A `HashMap` containing the filter arguments (not used yet)
 ///
 /// # Returns
-/// A closure that can be used with Tera's register_filter
+/// A closure that can be used with Tera's `register_filter`
 pub fn create_pad_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Result<Value, TeraError> {
     move |value: &Value, _args: &HashMap<String, Value>| {
         let text = tera::try_get_value!("pad", "value", String, value);

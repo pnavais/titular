@@ -5,7 +5,7 @@ use tera::{Error as TeraError, Value};
 /// Type alias for a function that provides an optional string value
 pub type ValueProviderFn = fn(&str) -> std::result::Result<Option<String>, TeraError>;
 
-/// Default function that gets a value from ContextManager
+/// Default function that gets a value from `ContextManager`
 fn default_value_provider(key: &str) -> std::result::Result<Option<String>, TeraError> {
     use crate::context_manager::ContextManager;
     let ctx = ContextManager::get()
@@ -23,7 +23,7 @@ pub fn create_hide_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Resul
 /// Create a hide filter closure for Tera with a custom value provider
 ///
 /// # Arguments
-/// * `value_provider` - Function that provides a string value for a given key. Defaults to using ContextManager if None.
+/// * `value_provider` - Function that provides a string value for a given key. Defaults to using `ContextManager` if None.
 ///
 /// # Returns
 /// A filter that replaces the text with spaces of the same visual width if the hide flag is active.
@@ -38,8 +38,7 @@ pub fn create_hide_filter_with(
 
         // Check if hide flag is active
         let is_active = get_value("hide")?
-            .map(|v| matches!(v.trim().to_lowercase().as_str(), "true" | "1"))
-            .unwrap_or(false);
+            .is_some_and(|v| matches!(v.trim().to_lowercase().as_str(), "true" | "1"));
 
         if is_active {
             // Strip ANSI codes and measure the visual width

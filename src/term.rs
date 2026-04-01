@@ -1,4 +1,3 @@
-use once_cell::sync::Lazy;
 
 #[derive(Default)]
 pub struct TermSize {
@@ -11,6 +10,7 @@ pub struct TermSize {
 /// # Returns
 /// A `TermSize` struct with the stored terminal width and height
 impl TermSize {
+    #[must_use] 
     pub fn new() -> TermSize {
         if let Some((w, h)) = Self::get_dimensions() {
             TermSize {
@@ -38,9 +38,9 @@ impl TermSize {
 
         #[cfg(all(feature = "display", not(feature = "minimal")))]
         {
-            return crossterm::terminal::size()
+            crossterm::terminal::size()
                 .ok()
-                .map(|(w, h)| (w as usize, h as usize));
+                .map(|(w, h)| (w as usize, h as usize))
         }
 
         #[cfg(not(any(feature = "minimal", feature = "display")))]
@@ -53,6 +53,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The stored terminal width
+    #[must_use] 
     pub fn get_term_width(&self) -> usize {
         self.width
     }
@@ -61,6 +62,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The stored terminal height
+    #[must_use] 
     pub fn get_term_height(&self) -> usize {
         self.height
     }
@@ -69,6 +71,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The current terminal width
+    #[must_use] 
     pub fn get_current_width() -> usize {
         if let Some((w, _h)) = Self::get_dimensions() {
             w
@@ -78,4 +81,4 @@ impl TermSize {
     }
 }
 
-pub static TERM_SIZE: Lazy<TermSize> = Lazy::new(TermSize::new);
+pub static TERM_SIZE: std::sync::LazyLock<TermSize> = std::sync::LazyLock::new(TermSize::new);

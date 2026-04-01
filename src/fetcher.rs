@@ -1,6 +1,6 @@
 pub struct TemplateFetcher;
 
-use std::{fmt::Write, io::Write as _, path::PathBuf};
+use std::{fmt::Write, io::Write as _, path::{Path, PathBuf}};
 
 use crate::{
     constants::template::DEFAULT_TEMPLATE_EXT,
@@ -19,7 +19,7 @@ use nu_ansi_term::Color::{Green, Yellow};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use std::time::Duration;
 
-use crate::error::*;
+use crate::error::{Result, Error};
 use crossterm::cursor::{Hide, Show};
 
 pub struct TargetInfo {
@@ -42,6 +42,9 @@ impl TemplateFetcher {
     ///
     /// # Returns
     /// * `Result<bool>` - `Ok(true)` if the template was downloaded successfully, `Ok(false)` if the template already exists, or an error if the download failed.
+    ///
+    /// # Errors
+    /// Returns an error if URL dispatch or download fails.
     pub fn fetch(url: &str, templates_dir: &PathBuf, force: bool) -> Result<bool> {
         let url_list = URLDispatcher::process(url)?;
         for url in url_list {
@@ -50,14 +53,13 @@ impl TemplateFetcher {
                     println!(
                         "{}",
                         Green.paint(format!(
-                            "Template '{}' installed successfully",
-                            template_name
+                            "Template '{template_name}' installed successfully"
                         ))
                     );
                 }
             } else {
                 return Err(Error::TemplateDownloadError(
-                    url.to_string(),
+                    url.clone(),
                     "Failed to download template".to_string(),
                 ));
             }
@@ -76,6 +78,9 @@ impl TemplateFetcher {
     /// * `Result<bool>`
     /// - `Ok(true)` if the template was downloaded successfully,
     /// - `Ok(false)` if the template already exists, or an error if the download failed.
+    ///
+    /// # Errors
+    /// Returns an error if the remote cannot be fetched or no matching template URL exists.
     pub fn fetch_from_remote<S: AsRef<str>>(
         remote: S,
         template_name: &str,
@@ -85,7 +90,7 @@ impl TemplateFetcher {
 
         // Try to find a URL that matches the template name
         let matching_url = url_list.iter().find(|url| {
-            url.ends_with(template_name) || url.ends_with(&format!("{}.tl", template_name))
+            url.ends_with(template_name) || url.ends_with(&format!("{template_name}.tl"))
         });
 
         match matching_url {
@@ -114,6 +119,9 @@ impl TemplateFetcher {
     ///
     /// # Returns
     /// * `Result<bool>` - `Ok(true)` if the template was downloaded successfully, `Ok(false)` if the template already exists, or an error if the download failed.
+    ///
+    /// # Errors
+    /// Returns an error if the download or post-processing fails.
     pub fn fetch_single(url: &str, templates_dir: &PathBuf, force: bool) -> Result<(bool, String)> {
         let result =
             async { TemplateFetcher::download_file(url, templates_dir, force, true).await };
@@ -242,43 +250,40 @@ impl TemplateFetcher {
     /// # Returns
     /// A `Result` indicating success or failure.
     fn process_fetched_template(target_info: &mut TargetInfo, force: bool) -> Result<bool> {
-        match TemplateReader::get_template_name(&target_info.path) {
-            Ok(mut template_name) => {
-                template_name = template_name.to_lowercase().replace(" ", "_");
-                if !template_name.ends_with(DEFAULT_TEMPLATE_EXT) {
-                    template_name = format!("{}{}", template_name, DEFAULT_TEMPLATE_EXT);
-                }
-
-                if target_info.created && target_info.filename != template_name {
-                    if force {
-                        std::fs::rename(
-                            &target_info.path,
-                            target_info.path.with_file_name(&template_name),
-                        )?;
-                    } else {
-                        println!(
-                            "{}",
-                            Yellow.paint(format!(
-                                "A template with the same name [{}] already exists",
-                                target_info.filename
-                            ))
-                        );
-                    }
-                    return Ok(false);
-                }
-
-                Ok(true)
+        if let Ok(mut template_name) = TemplateReader::get_template_name(&target_info.path) {
+            template_name = template_name.to_lowercase().replace(' ', "_");
+            if !template_name.ends_with(DEFAULT_TEMPLATE_EXT) {
+                template_name = format!("{template_name}{DEFAULT_TEMPLATE_EXT}");
             }
-            Err(_) => {
-                std::fs::remove_file(&target_info.path)?;
-                Err(Error::TemplateDownloadError(
-                    target_info
-                        .url
-                        .as_ref()
-                        .map_or_else(|| target_info.filename.clone(), |url| url.clone()),
-                    "Error parsing template".to_string(),
-                ))
+
+            if target_info.created && target_info.filename != template_name {
+                if force {
+                    std::fs::rename(
+                        &target_info.path,
+                        target_info.path.with_file_name(&template_name),
+                    )?;
+                } else {
+                    println!(
+                        "{}",
+                        Yellow.paint(format!(
+                            "A template with the same name [{}] already exists",
+                            target_info.filename
+                        ))
+                    );
+                }
+                return Ok(false);
             }
+
+            Ok(true)
+        } else {
+            std::fs::remove_file(&target_info.path)?;
+            Err(Error::TemplateDownloadError(
+                target_info
+                    .url
+                    .as_ref()
+                    .map_or_else(|| target_info.filename.clone(), std::clone::Clone::clone),
+                "Error parsing template".to_string(),
+            ))
         }
     }
 
@@ -290,7 +295,7 @@ impl TemplateFetcher {
     ///
     /// # Returns
     /// A `TargetInfo` struct containing the path and filename of the template.
-    fn build_target_path(url: &str, templates_dir: &PathBuf) -> Result<TargetInfo> {
+    fn build_target_path(url: &str, templates_dir: &std::path::Path) -> Result<TargetInfo> {
         match TemplateFetcher::extract_filename_from_url(url) {
             Some(filename) => {
                 // We have a filename from the URL
@@ -336,7 +341,7 @@ impl TemplateFetcher {
     ///
     /// # Returns
     /// A tuple containing the final URL, final path, and total size of the resource.
-    async fn pre_process_url(url: &str, path: &PathBuf) -> Result<TargetInfo> {
+    async fn pre_process_url(url: &str, path: &Path) -> Result<TargetInfo> {
         // Send request without compression to get headers and actual content-length
         let response = Request::head(url)
             .header("Accept-Encoding", "identity")
@@ -354,7 +359,7 @@ impl TemplateFetcher {
                     .and_then(|v| v.to_str().ok())
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
-                let final_url = r.effective_uri().map_or(url.to_string(), |u| u.to_string());
+                let final_url = r.effective_uri().map_or(url.to_string(), std::string::ToString::to_string);
                 (total_size, final_url)
             }
             Err(_) => (0, url.to_string()),

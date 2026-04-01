@@ -2,7 +2,6 @@ use crate::prelude::*;
 use crate::string_utils::expand_to_visual_width;
 use crate::term::TERM_SIZE;
 use console::{measure_text_width, strip_ansi_codes};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::{Arc, Mutex};
 
@@ -14,7 +13,7 @@ struct MatchedGroup {
 }
 
 // Regex to match content between our non-visible markers
-static PAD_PATTERN: Lazy<Regex> = Lazy::new(|| {
+static PAD_PATTERN: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(&format!(
         r"{start}(.*?){end}",
         start = regex::escape(&padding::START.to_string()),
@@ -33,7 +32,7 @@ impl Default for TextProcessor {
     }
 }
 
-/// TextProcessor is a transform that processes the text with padding groups.
+/// `TextProcessor` is a transform that processes the text with padding groups.
 /// It is used to process functions that need global line width information for applying
 /// operations like padding and line wrapping.
 impl TextProcessor {
@@ -42,13 +41,14 @@ impl TextProcessor {
         Box::new(|| TERM_SIZE.get_term_width())
     }
 
-    /// Creates a new TextProcessor with a custom width provider
+    /// Creates a new `TextProcessor` with a custom width provider
     ///
     /// # Arguments
     /// * `width_provider` - A function that returns the width of the terminal
     ///
     /// # Returns
-    /// A new TextProcessor with the specified width provider
+    /// A new `TextProcessor` with the specified width provider
+    #[must_use] 
     pub fn new(width_provider: Box<dyn Fn() -> usize + Send + Sync>) -> Self {
         Self {
             get_width: Arc::new(Mutex::new(width_provider)),
@@ -62,6 +62,7 @@ impl TextProcessor {
     ///
     /// # Returns
     /// A string with the processed content
+    #[must_use] 
     pub fn process_padding(&self, content: &str) -> String {
         content
             .lines()
@@ -71,15 +72,15 @@ impl TextProcessor {
     }
 
     /// Process a single line of content with padding and line wrapping.
-    /// This is the main entry point for processing a line that may contain pad() calls.
+    /// This is the main entry point for processing a line that may contain `pad()` calls.
     ///
     /// # Arguments
-    /// * `content` - The content to process, which may contain pad() calls
+    /// * `content` - The content to process, which may contain `pad()` calls
     ///
     /// # Returns
-    /// A string with all pad() calls processed:
-    /// - Empty pad() calls are removed
-    /// - Non-empty pad() calls are expanded to fill available space
+    /// A string with all `pad()` calls processed:
+    /// - Empty `pad()` calls are removed
+    /// - Non-empty `pad()` calls are expanded to fill available space
     ///
     /// # Examples
     /// ```
@@ -107,12 +108,12 @@ impl TextProcessor {
         let mut result = content.to_string();
 
         // First remove all empty padding groups from the string
-        self.remove_empty_pads(&mut result);
+        Self::remove_empty_pads(&mut result);
 
         // Extract and process padding groups
-        let (groups, text_without_pads) = self.extract_padding_groups(&result);
+        let (groups, text_without_pads) = Self::extract_padding_groups(&result);
         if !groups.is_empty() {
-            self.process_padding_groups(&mut result, groups, text_without_pads);
+            self.process_padding_groups(&mut result, &groups, text_without_pads);
         }
 
         result
@@ -121,7 +122,7 @@ impl TextProcessor {
     /// Removes all empty padding groups from the given string.
     /// This method modifies the string in place by removing any padding groups
     /// that have no content between the markers.
-    fn remove_empty_pads(&self, result: &mut String) {
+    fn remove_empty_pads(result: &mut String) {
         // Use regex to find all padding groups
         let pattern = format!(
             r"{}(.*?){}",
@@ -161,7 +162,7 @@ impl TextProcessor {
     /// A tuple containing:
     /// - Vector of padding group information
     /// - Total occupied space (outside text + padding content)
-    fn extract_padding_groups(&self, content: &str) -> (Vec<MatchedGroup>, usize) {
+    fn extract_padding_groups(content: &str) -> (Vec<MatchedGroup>, usize) {
         let stripped_content = strip_ansi_codes(content);
         let stripped_width = measure_text_width(&stripped_content);
 
@@ -203,15 +204,15 @@ impl TextProcessor {
     }
 
     /// Process non-empty padding groups in the given string.
-    /// This method handles the expansion of pad() calls that contain content,
+    /// This method handles the expansion of `pad()` calls that contain content,
     /// distributing the available space among all groups.
     ///
     /// # Arguments
     /// * `result` - A mutable reference to the string to process. The string will be
-    ///             modified in place to expand pad() calls.
+    ///   modified in place to expand `pad()` calls.
     /// * `groups` - A vector of matched padding groups found in the string
     /// * `text_without_pads` - The width of the text excluding padding groups,
-    ///                        used to calculate available space for padding
+    ///   used to calculate available space for padding
     ///
     /// # Note
     /// The available space is distributed evenly among all padding groups,
@@ -242,7 +243,7 @@ impl TextProcessor {
     fn process_padding_groups(
         &self,
         result: &mut String,
-        groups: Vec<MatchedGroup>,
+        groups: &[MatchedGroup],
         text_without_pads: usize,
     ) {
         // Filter out empty padding groups
@@ -263,7 +264,7 @@ impl TextProcessor {
 
         // Process all groups in reverse order to maintain correct indices
         for (i, group) in non_empty_groups.iter().rev().enumerate() {
-            self.expand_padding_group(
+            Self::expand_padding_group(
                 result,
                 group,
                 if i == 0 {
@@ -276,19 +277,19 @@ impl TextProcessor {
     }
 
     /// Expands a single padding group with the given width.
-    /// This method handles the actual expansion of a pad() call's content,
+    /// This method handles the actual expansion of a `pad()` call's content,
     /// preserving any ANSI codes while expanding the content to fill the
     /// specified width.
     ///
     /// # Arguments
-    /// * `result` - A mutable reference to the string containing the pad() call
+    /// * `result` - A mutable reference to the string containing the `pad()` call
     /// * `group` - The padding group to expand, containing the content and its
-    ///            position in the string
+    ///   position in the string
     /// * `padding_width` - The target width to expand the content to
     ///
     /// # Note
     /// The method preserves any ANSI codes in the content by:
-    /// 1. Finding the actual content position within the pad() call
+    /// 1. Finding the actual content position within the `pad()` call
     /// 2. Preserving any ANSI codes before and after the content
     /// 3. Expanding only the content part while maintaining the codes
     ///
@@ -311,7 +312,6 @@ impl TextProcessor {
     /// assert!(result.len() > "\x1b[31m→\x1b[0m".len());
     /// ```
     fn expand_padding_group(
-        &self,
         result: &mut String,
         group: &MatchedGroup,
         padding_width: usize,
@@ -332,7 +332,7 @@ impl TextProcessor {
         let suffix = &group.content[content_end..];
 
         // Combine the ANSI codes with the expanded content
-        let final_content = format!("{}{}{}", prefix, expanded_content, suffix);
+        let final_content = format!("{prefix}{expanded_content}{suffix}");
 
         // Replace the entire pad() structure with the expanded content
         result.replace_range(group.start..group.end, &final_content);
@@ -367,7 +367,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].content, "hello");
         assert_eq!(groups[1].content, "foo");
@@ -378,7 +378,7 @@ mod tests {
     fn test_extract_padding_groups_empty() {
         let processor = TextProcessor::default();
         let input = format!("{}{}", padding::START, padding::END);
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(
             groups.len(),
             1,
@@ -404,7 +404,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].content, "\x1b[31mhello\x1b[0m");
         assert_eq!(groups[1].content, "foo");
@@ -421,7 +421,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].content, "hello 🦀");
         assert_eq!(groups[1].content, "foo");
@@ -438,7 +438,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].content, "\x1b[31mhello 🦀\x1b[0m");
         assert_eq!(groups[1].content, "foo");
@@ -449,7 +449,7 @@ mod tests {
     fn test_extract_padding_groups_no_markers() {
         let processor = TextProcessor::default();
         let input = "hello world";
-        let (groups, text_width) = processor.extract_padding_groups(input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(input);
         assert_eq!(groups.len(), 0);
         assert_eq!(text_width, measure_text_width(input));
     }
@@ -458,7 +458,7 @@ mod tests {
     fn test_extract_padding_groups_unmatched_start() {
         let processor = TextProcessor::default();
         let input = format!("{}hello world", padding::START);
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 0);
         assert_eq!(text_width, measure_text_width(&input));
     }
@@ -467,7 +467,7 @@ mod tests {
     fn test_extract_padding_groups_unmatched_end() {
         let processor = TextProcessor::default();
         let input = format!("hello world{}", padding::END);
-        let (groups, text_width) = processor.extract_padding_groups(&input);
+        let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 0);
         assert_eq!(text_width, measure_text_width(&input));
     }
@@ -506,7 +506,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        processor.remove_empty_pads(&mut input);
+        TextProcessor::remove_empty_pads(&mut input);
         assert_eq!(input, "Hello  World  Test");
 
         // Test with non-empty padding
@@ -517,7 +517,7 @@ mod tests {
             padding::START,
             padding::END
         );
-        processor.remove_empty_pads(&mut input);
+        TextProcessor::remove_empty_pads(&mut input);
         assert_eq!(
             input,
             format!(

@@ -13,11 +13,12 @@ impl Default for AnsiFormatter {
 }
 
 impl AnsiFormatter {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
 
-    fn process_ansi_codes(&self, input: &str) -> String {
+    fn process_ansi_codes(input: &str) -> String {
         let mut result = String::new();
         let mut stack = VecDeque::<String>::new();
 
@@ -35,7 +36,7 @@ impl AnsiFormatter {
                         // Full reset - pop last element
                         if stack.pop_back().is_some() {
                             // After reset, reapply remaining stack in order
-                            for code in stack.iter() {
+                            for code in &stack {
                                 result.push_str(code);
                             }
                         }
@@ -58,7 +59,7 @@ impl AnsiFormatter {
 
 impl Transform for AnsiFormatter {
     fn transform(&self, text: &str) -> Result<String> {
-        Ok(self.process_ansi_codes(text))
+        Ok(Self::process_ansi_codes(text))
     }
 }
 

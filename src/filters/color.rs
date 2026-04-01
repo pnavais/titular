@@ -7,7 +7,7 @@ use crate::context_manager::ContextManager;
 /// Create a color filter closure for Tera
 ///
 /// # Returns
-/// A closure that can be used with Tera's register_filter
+/// A closure that can be used with Tera's `register_filter`
 pub fn create_color_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Result<Value, TeraError>
 {
     move |value: &Value, args: &HashMap<String, Value>| {
@@ -24,7 +24,7 @@ pub fn create_color_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Resu
             .to_string();
 
         // Default to false if is_bg is not provided or not a boolean
-        let is_bg = args.get("is_bg").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_bg = args.get("is_bg").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
         let style = StyleFormat {
             fg_color: (!is_bg).then_some(color_value.clone()),

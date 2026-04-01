@@ -32,6 +32,7 @@ pub struct Context {
 
 /// Provides the methods to access the values present in the context struct
 impl Context {
+    #[must_use] 
     pub fn new() -> Self {
         Context {
             template: TemplateContext::default(),
@@ -61,6 +62,7 @@ impl Context {
     ///
     /// # Returns
     /// An option containing a reference to the component if found
+    #[must_use] 
     pub fn get_object<T: 'static + Send + Sync>(&self, key: &str) -> Option<&T> {
         self.registry
             .items
@@ -82,7 +84,7 @@ impl Context {
             .and_then(|obj| obj.downcast::<T>().ok().map(|boxed| *boxed))
     }
 
-    /// Resolves a variable reference in the format $var or ${var:default_value}
+    /// Resolves a variable reference in the format $var or ${`var:default_value`}
     fn resolve_variable(&self, value: &str, visited: &mut HashSet<String>) -> Result<String> {
         // Check if the value is a variable reference
         if !value.starts_with('$') {
@@ -96,8 +98,8 @@ impl Context {
                 Some((name, default)) => (name, Some(default)),
                 None => (content, None),
             }
-        } else if value.starts_with('$') {
-            (&value[1..], None)
+        } else if let Some(rest) = value.strip_prefix('$') {
+            (rest, None)
         } else {
             return Ok(value.to_string());
         };
@@ -117,7 +119,7 @@ impl Context {
                 // If no value found and we have a default, try to resolve it
                 if let Some(default) = default_value {
                     // Recursively resolve the default value
-                    self.resolve_variable(&format!("${}", default), visited)?
+                    self.resolve_variable(&format!("${default}"), visited)?
                 } else {
                     return Err(Error::ContextVariableNotFound(var_name.to_string()));
                 }
@@ -134,6 +136,7 @@ impl Context {
     }
 
     /// Returns a reference to the underlying tera context
+    #[must_use] 
     pub fn get_data(&self) -> &TeraContext {
         &self.template.data
     }
@@ -142,9 +145,9 @@ impl Context {
     ///
     /// # Arguments
     /// * `missing_vars` - Vector of missing variables with their associated keys
-    fn resolve_missing_vars(&mut self, _missing_vars: Vec<MissingVar>) {
+    fn resolve_missing_vars(&mut self, missing_vars: Vec<MissingVar>) {
         // Intentionally left empty for now
-        for missing in _missing_vars {
+        for missing in missing_vars {
             let value = match self.resolve_variable(&missing.var, &mut HashSet::new()) {
                 Ok(resolved) => Value::String(resolved),
                 Err(_) => Value::String(if missing.var.starts_with('$') {
@@ -250,17 +253,14 @@ impl Context {
         let value = match serde_json::to_value(val) {
             Ok(Value::String(s)) => {
                 // Try to resolve variable references
-                match self.resolve_variable(&s, &mut HashSet::new()) {
-                    Ok(resolved) => Value::String(resolved),
-                    Err(_) => {
-                        let value = Value::String(if s.starts_with('$') {
-                            String::new()
-                        } else {
-                            s.clone()
-                        });
-                        failed_value = Some(s);
-                        value
-                    }
+                if let Ok(resolved) = self.resolve_variable(&s, &mut HashSet::new()) { Value::String(resolved) } else {
+                    let value = Value::String(if s.starts_with('$') {
+                        String::new()
+                    } else {
+                        s.clone()
+                    });
+                    failed_value = Some(s);
+                    value
                 }
             }
             Ok(v) => v,
@@ -285,6 +285,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns an option containing a reference to the value associated with the given key.
+    #[must_use] 
     pub fn get_raw(&self, key: &str) -> Option<&Value> {
         self.template.data.get(key)
     }
@@ -298,6 +299,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns an option containing a reference to the value associated with the given key.
+    #[must_use] 
     pub fn get(&self, key: &str) -> Option<&str> {
         self.get_raw(key).and_then(|v| match v {
             Value::Array(arr) if !arr.is_empty() => arr[0].as_str(),
@@ -312,6 +314,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns a vector of strings containing all values associated with the given key.
+    #[must_use] 
     pub fn get_all(&self, key: &str) -> Option<Vec<&str>> {
         self.get_raw(key).and_then(|v| match v {
             Value::Array(arr) => {
@@ -333,6 +336,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns `true` if the key exists and its value is "true" or "1", `false` otherwise.
+    #[must_use] 
     pub fn get_flag(&self, key: &str) -> Option<bool> {
         match self.template.data.get(key) {
             Some(v) => Some(matches!(
@@ -351,6 +355,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns `true` if the key exists and its value is "true" or "1", `false` otherwise.
+    #[must_use] 
     pub fn is_active(&self, key: &str) -> bool {
         match self.get(key) {
             Some(v) => matches!(v.trim().to_lowercase().as_str(), "true" | "1"),
@@ -419,12 +424,12 @@ impl Context {
         println!("Template Variables:");
         for key in &self.template.keys {
             if let Some(value) = self.get_raw(key) {
-                println!("  {} = {:?}", key, value);
+                println!("  {key} = {value:?}");
             }
         }
         println!("\nRegistry Items:");
         for key in self.registry.items.keys() {
-            println!("  {} = <object>", key);
+            println!("  {key} = <object>");
         }
         println!("------------------------\n");
     }

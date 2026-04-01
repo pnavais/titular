@@ -1,5 +1,4 @@
 use chrono::Local;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error as StdError;
 use std::sync::Mutex;
@@ -7,15 +6,15 @@ use tera::Tera;
 
 use crate::config::TemplateConfig;
 use crate::constants::template::DEFAULT_TIME_FORMAT;
-use crate::error::*;
+use crate::error::{Result, Error};
 use crate::filters::{append, color, hide, pad, style, surround};
 use crate::functions::exit_code;
 use crate::prelude::*;
 use crate::utils::safe_time_format;
 
-static TERA_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+static TERA_VAR_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
 
-static TERA: Lazy<Mutex<Tera>> = Lazy::new(|| {
+static TERA: std::sync::LazyLock<Mutex<Tera>> = std::sync::LazyLock::new(|| {
     let mut tera = Tera::default();
     tera.register_filter("color", color::create_color_filter());
     tera.register_filter("style", style::create_style_filter());
@@ -27,14 +26,14 @@ static TERA: Lazy<Mutex<Tera>> = Lazy::new(|| {
     Mutex::new(tera)
 });
 
-static FILTER_ARGS_REGEX: Lazy<Regex> = Lazy::new(|| {
+static FILTER_ARGS_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     // Captures: 1=filter_name, 2=arguments
     Regex::new(r"(\w+)\(([^)]+)\)").unwrap()
 });
 
 pub struct TemplateRenderer {}
 
-/// TemplateRenderer is a transform that renders a template string using the provided context.
+/// `TemplateRenderer` is a transform that renders a template string using the provided context.
 /// It uses the Tera template engine to render the template under the hood.
 /// It also registers the custom filters (color and style filters) to be used by the Tera engine.
 impl Default for TemplateRenderer {
@@ -44,6 +43,7 @@ impl Default for TemplateRenderer {
 }
 
 impl TemplateRenderer {
+    #[must_use] 
     pub fn new() -> Self {
         Self {}
     }
@@ -113,7 +113,7 @@ impl TemplateRenderer {
                     )
                 } else {
                     // No filters, just add default
-                    format!("{{{{ {} | default(value='') }}}}", content)
+                    format!("{{{{ {content} | default(value='') }}}}")
                 }
             })
             .to_string()
@@ -162,6 +162,9 @@ impl TemplateRenderer {
     ///
     /// # Returns
     /// A rendered string
+    ///
+    /// # Errors
+    /// Returns an error if the pattern cannot be preprocessed, context is missing, or Tera render fails.
     pub fn render(&self, pattern_data: &str) -> Result<String> {
         let pattern = Self::pre_process_pattern(pattern_data)?;
 
@@ -178,7 +181,7 @@ impl TemplateRenderer {
                 .details
                 .name
                 .to_lowercase()
-                .replace(" ", "_")
+                .replace(' ', "_")
         };
 
         let mut tera = TERA

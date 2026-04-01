@@ -19,6 +19,7 @@ Use **[just](https://github.com/casey/just)** for repeatable workflows. If a ste
 | `just fmt` | `cargo fmt` (all packages) |
 | `just lint` | clippy with project warnings (`clippy:all`, `pedantic`) |
 | `just lint-full` | clippy for `full_application` feature set |
+| `just lint-full-fix` | same as `lint-full` but runs Clippy **`--fix`** on the lib (needs matching features; do not use plain `cargo clippy --fix --lib` for this) |
 | `just test` | `cargo test` (extra args supported) |
 | `just check` | **fmt --check + lint + test** (default feature set); use before considering work done |
 | `just c` | alias for `check` |

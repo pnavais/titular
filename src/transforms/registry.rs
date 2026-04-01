@@ -1,6 +1,5 @@
 use super::Transform;
 use crate::error::Result;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -16,6 +15,7 @@ impl Default for TransformRegistry {
 }
 
 impl TransformRegistry {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             transforms: HashMap::new(),
@@ -24,10 +24,10 @@ impl TransformRegistry {
     }
 
     /// Initializes the transform registry with the default transforms
-    /// - TemplateRenderer: Renders the template using the Tera engine
-    /// - TextProcessor: Processes the text handling padding and line wrapping
-    /// - LineHandler: Handles line endings based on context flags
-    /// - AnsiFormatter: Handles ANSI escape sequences and nested colors
+    /// - `TemplateRenderer`: Renders the template using the Tera engine
+    /// - `TextProcessor`: Processes the text handling padding and line wrapping
+    /// - `LineHandler`: Handles line endings based on context flags
+    /// - `AnsiFormatter`: Handles ANSI escape sequences and nested colors
     pub fn init(&mut self) {
         self.register("template_renderer", super::TemplateRenderer::new());
         self.register("text_processor", super::TextProcessor::default());
@@ -41,6 +41,7 @@ impl TransformRegistry {
         self.order.push(boxed);
     }
 
+    #[must_use] 
     pub fn get(&self, name: &str) -> Option<&Arc<Box<dyn Transform>>> {
         self.transforms.get(name)
     }
@@ -52,6 +53,9 @@ impl TransformRegistry {
     ///
     /// # Returns
     /// The processed text after applying all transforms or an error if any transform fails
+    ///
+    /// # Errors
+    /// Returns the first error produced by any transform in the chain.
     pub fn process(&self, text: &str) -> Result<String> {
         self.order
             .iter()
@@ -66,8 +70,9 @@ pub struct TransformManager {
 
 impl TransformManager {
     /// Gets a reference to the global transform manager
+    #[must_use] 
     pub fn get() -> &'static TransformManager {
-        static INSTANCE: Lazy<TransformManager> = Lazy::new(|| {
+        static INSTANCE: std::sync::LazyLock<TransformManager> = std::sync::LazyLock::new(|| {
             let mut registry = TransformRegistry::new();
             registry.init();
             TransformManager {
@@ -78,6 +83,7 @@ impl TransformManager {
     }
 
     /// Gets a clone of the shared registry
+    #[must_use] 
     pub fn share(&self) -> Arc<TransformRegistry> {
         Arc::clone(&self.registry)
     }
@@ -89,11 +95,15 @@ impl TransformManager {
     ///
     /// # Returns
     /// The processed text after applying all transforms or an error if any transform fails
+    ///
+    /// # Errors
+    /// Returns the first error produced by any transform in the chain.
     pub fn process(&self, text: &str) -> Result<String> {
         self.registry.process(text)
     }
 
     /// Gets a transform by name
+    #[must_use] 
     pub fn get_transform(&self, name: &str) -> Option<&Arc<Box<dyn Transform>>> {
         self.registry.get(name)
     }

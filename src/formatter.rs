@@ -14,6 +14,7 @@ pub struct TemplateFormatter<'a> {
 }
 
 impl<'a> TemplateFormatter<'a> {
+    #[must_use] 
     pub fn new(input_dir: &'a std::path::PathBuf, config: &'a MainConfig) -> Self {
         Self { input_dir, config }
     }
@@ -28,11 +29,14 @@ impl<'a> TemplateFormatter<'a> {
     ///
     /// # Returns
     /// Returns `Ok(true)` if the template was rendered successfully, `Err(Error)` if the template does not exist.
+    ///
+    /// # Errors
+    /// Returns an error if the template cannot be loaded, context cannot be updated, or rendering fails.
     pub fn format(&self, context: &Context, template_name: &str) -> Result<bool> {
         self.preprocess_template(template_name)?;
 
         let template_payload = TemplateReader::read(self.input_dir, template_name)?;
-        let pattern_data = template_payload.pattern.data.to_string();
+        let pattern_data = template_payload.pattern.data.clone();
 
         // Update the context in a clean way
         crate::context_manager::ContextManager::get().update(|ctx| {

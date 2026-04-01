@@ -1,13 +1,13 @@
 use crate::{
     config::{parse as config_parse, TemplateConfig},
     constants::template::DEFAULT_TEMPLATE_EXT,
-    error::*,
+    error::{Result, Error, ConfigType},
     log,
 };
 
 use nu_ansi_term::Color::Yellow;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct TemplateReader {}
 
@@ -49,8 +49,11 @@ impl TemplateReader {
     /// let template_config = TemplateReader::read(&input_dir, "test");
     /// assert!(template_config.is_ok());
     /// ```
-    pub fn read(input_dir: &PathBuf, template_name: &str) -> Result<TemplateConfig> {
-        let template_path = TemplateReader::get_template_path(input_dir, template_name)?;
+    ///
+    /// # Errors
+    /// Returns an error if the template file cannot be read or parsed.
+    pub fn read(input_dir: &Path, template_name: &str) -> Result<TemplateConfig> {
+        let template_path = TemplateReader::get_template_path(input_dir, template_name);
 
         TemplateReader::parse_data(&template_path, template_name)
     }
@@ -155,7 +158,7 @@ impl TemplateReader {
     /// # Returns
     ///
     /// The path to the template file.
-    fn get_template_path(input_dir: &PathBuf, template_name: &str) -> Result<PathBuf> {
+    fn get_template_path(input_dir: &Path, template_name: &str) -> PathBuf {
         // Normalize the template name by adding .tl extension if needed
         let normalized_name = if template_name.ends_with(DEFAULT_TEMPLATE_EXT) {
             template_name.to_string()
@@ -163,9 +166,7 @@ impl TemplateReader {
             template_name.to_string() + DEFAULT_TEMPLATE_EXT
         };
 
-        // Join the input directory with the normalized template name
-        let template_path = input_dir.join(&normalized_name);
-        Ok(template_path)
+        input_dir.join(&normalized_name)
     }
 
     /// Parses the template data from the given path.

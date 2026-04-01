@@ -15,7 +15,7 @@ use crate::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 use crate::constants::template::DEFAULT_REMOTE_REPO;
 #[cfg(feature = "display")]
 use crate::constants::template::DEFAULT_THEME;
-use crate::error::*;
+use crate::error::{Error, Result};
 use crate::utils::safe_time_format;
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -119,6 +119,7 @@ impl Default for Templates {
 }
 
 impl MainConfig {
+    #[must_use] 
     pub fn new() -> Self {
         let mut main_config = MainConfig {
             ..Default::default()
@@ -132,7 +133,7 @@ impl MainConfig {
         // Keep defaults as vars
         self.defaults.to_map().iter().for_each(|(k, v)| {
             self.vars
-                .insert(format!("defaults.{}", k), v.to_string());
+                .insert(format!("defaults.{k}"), v.clone());
         });
         // Add misc vars
         self.vars.insert(
@@ -153,11 +154,15 @@ impl FromStr for Display {
             "raw" => Ok(Display::Raw),
             #[cfg(feature = "display")]
             "fancy" => Ok(Display::Fancy),
-            _ => Err(Error::ConfigError(format!("Invalid display: {}", s))),
+            _ => Err(Error::ConfigError(format!("Invalid display: {s}"))),
         }
     }
 }
 
+/// Reads the entire contents of a configuration file into a string.
+///
+/// # Errors
+/// Returns an error if the file cannot be opened or read.
 pub fn parse(file_path: &PathBuf) -> Result<String> {
     let mut config_content = String::new();
     File::open(file_path)?.read_to_string(&mut config_content)?;
@@ -165,9 +170,15 @@ pub fn parse(file_path: &PathBuf) -> Result<String> {
 }
 
 impl Defaults {
+    /// Serializes defaults to a flat string map (via JSON) for template variables.
+    ///
+    /// # Panics
+    /// Panics if `self` cannot be serialized to JSON. This should not happen for a valid `Defaults` value.
+    #[must_use]
     pub fn to_map(&self) -> BTreeMap<String, String> {
         // Convert the struct to a JSON value
-        let json_value = serde_json::to_value(self).unwrap();
+        let json_value = serde_json::to_value(self)
+            .expect("Defaults should always serialize to JSON");
 
         // Convert JSON object to HashMap
         let mut map = BTreeMap::new();
