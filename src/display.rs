@@ -8,6 +8,7 @@ use std::io::IsTerminal;
 use std::str::FromStr;
 
 use crate::config::Display;
+#[cfg(feature = "display")]
 use crate::constants::template::DEFAULT_THEME;
 use crate::context::Context;
 use crate::error::*;
@@ -65,7 +66,7 @@ fn check_pager(context: &Context, path: &Path) -> Result<()> {
         context
             .get("mode")
             .or_else(|| context.get("defaults.display"))
-            .unwrap_or(&"raw".to_string()),
+            .unwrap_or("raw"),
     )?;
 
     match display {
@@ -103,7 +104,7 @@ fn check_pager(context: &Context, path: &Path) -> Result<()> {
 /// # Returns
 /// A `Result` indicating success or failure.
 #[cfg(feature = "display")]
-fn display_fancy(content: &str, context: &Context) -> Result<()> {
+fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
     // Load the serialized syntax set from the build script
     let syntax_set_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/syntax_set.bin"));
     let syntax_set: SyntaxSet =
@@ -118,9 +119,9 @@ fn display_fancy(content: &str, context: &Context) -> Result<()> {
     // 1. Try to get theme from context
     // 2. Fallback to defaults.display_theme
     // 3. Finally use DEFAULT_THEME
-    let theme_name = context
+    let theme_name = ctx
         .get("theme")
-        .or_else(|| context.get("defaults.display_theme"))
+        .or_else(|| ctx.get("defaults.display_theme"))
         .map(|s| s as &str)
         .unwrap_or(DEFAULT_THEME);
 
@@ -159,7 +160,7 @@ fn display_fancy(content: &str, context: &Context) -> Result<()> {
 #[cfg(feature = "display")]
 pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     // Load the template content
-    let content = fs::read_to_string(path)?;
+    let file_content = fs::read_to_string(path)?;
     let display = Display::from_str(
         context
             .get("mode")
@@ -168,14 +169,16 @@ pub fn display_template(path: &Path, context: &Context) -> Result<()> {
     )?;
 
     // Setup pager if needed
-    if !matches!(display, Display::Fancy) || content.lines().count() > TERM_SIZE.get_term_height() {
+    if !matches!(display, Display::Fancy)
+        || file_content.lines().count() > TERM_SIZE.get_term_height()
+    {
         check_pager(context, path)?;
     }
 
     // Display content based on display type
     match display {
-        Display::Fancy => display_fancy(&content, context)?,
-        _ => writeln!(io::stdout().lock(), "{}", content)?,
+        Display::Fancy => display_fancy(&file_content, context)?,
+        _ => writeln!(io::stdout().lock(), "{}", file_content)?,
     }
 
     Ok(())

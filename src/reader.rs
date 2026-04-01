@@ -138,7 +138,7 @@ impl TemplateReader {
     /// assert_eq!(template_name.unwrap(), "test");
     /// ```
     pub fn get_template_name(path: &PathBuf) -> Result<String> {
-        Self::parse_data(&path, "unknown").map(|config| config.details.name)
+        Self::parse_data(path, "unknown").map(|config| config.details.name)
     }
 
     /// Get the path to the template file.
@@ -194,7 +194,7 @@ impl TemplateReader {
                         Yellow
                             .paint(format!(
                                 "\n[Template path] {}",
-                                template_path.to_string_lossy().to_string()
+                                template_path.to_string_lossy()
                             ))
                             .to_string(),
                     ),
@@ -220,7 +220,7 @@ impl TemplateReader {
                     Yellow
                         .paint(format!(
                             "\n[Template path]: {}",
-                            template_path.to_string_lossy().to_string()
+                            template_path.to_string_lossy()
                         ))
                         .to_string(),
                 ),

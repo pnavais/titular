@@ -2,26 +2,30 @@ use std::io::IsTerminal;
 
 use crate::{bootstrap::BootStrap, clap_app};
 use clap::{parser::ValueSource, ArgMatches};
-use titular::{context::Context, controller::TemplatesController, error::*};
+use titular::{
+    context::Context,
+    controller::TemplatesController,
+    error::{Error, Result},
+};
 
 pub struct App {
     pub matches: ArgMatches,
 }
 
 impl App {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Self {
         #[cfg(windows)]
         let _ = nu_ansi_term::enable_ansi_support();
 
         let interactive_output = std::io::stdout().is_terminal();
 
-        Ok(App {
-            matches: Self::matches(interactive_output)?,
-        })
+        App {
+            matches: Self::matches(interactive_output),
+        }
     }
 
-    pub fn matches(interactive_output: bool) -> Result<ArgMatches> {
-        Ok(clap_app::build_app(interactive_output).get_matches())
+    pub fn matches(interactive_output: bool) -> ArgMatches {
+        clap_app::build_app(interactive_output).get_matches()
     }
 
     /// Creates the context with the matched information supplied in the command
@@ -36,8 +40,7 @@ impl App {
             "template",
             self.matches
                 .get_one::<String>("template")
-                .map(|s| s.as_str())
-                .unwrap_or(""),
+                .map_or("", String::as_str),
         );
         if self.matches.contains_id("message") {
             context.insert_multi(
@@ -45,7 +48,7 @@ impl App {
                 self.matches
                     .get_many::<String>("message")
                     .unwrap()
-                    .map(|s| s.as_str())
+                    .map(String::as_str)
                     .collect(),
             );
         }
@@ -55,7 +58,7 @@ impl App {
                 self.matches
                     .get_many::<String>("filler")
                     .unwrap()
-                    .map(|s| s.as_str())
+                    .map(String::as_str)
                     .collect(),
             );
         }
@@ -65,7 +68,7 @@ impl App {
                 self.matches
                     .get_many::<String>("color")
                     .unwrap()
-                    .map(|s| s.as_str())
+                    .map(String::as_str)
                     .collect(),
             );
         }
@@ -74,14 +77,13 @@ impl App {
                 .matches
                 .get_many::<String>("set")
                 .unwrap()
-                .map(|s| s.as_str())
+                .map(String::as_str)
             {
                 if let Some((key, value)) = v.split_once('=') {
                     context.insert(key, value);
                 } else {
                     return Err(Error::ArgsProcessingError(format!(
-                        "Invalid set parameter supplied \"{}\" (Must be in key=value format)",
-                        v
+                        "Invalid set parameter supplied \"{v}\" (Must be in key=value format)"
                     )));
                 }
             }
@@ -91,7 +93,7 @@ impl App {
                 "width",
                 self.matches
                     .get_one::<u8>("width")
-                    .map(|w| w.to_string())
+                    .map(ToString::to_string)
                     .unwrap_or_default()
                     .as_str(),
             );
@@ -125,7 +127,7 @@ impl App {
     /// # Returns
     ///
     /// This function returns nothing.
-    fn add_params_to_context(&self, context: &mut Context, tpl_params: &ArgMatches) {
+    fn add_params_to_context(context: &mut Context, tpl_params: &ArgMatches) {
         let (id, args) = tpl_params.subcommand().unwrap();
         context.insert("subcommand", id);
 
@@ -147,7 +149,7 @@ impl App {
 
                 // Handle multiple values
                 if let Ok(Some(values)) = args.try_get_many::<String>(arg_name) {
-                    let values_vec: Vec<&str> = values.map(|v| v.as_str()).collect();
+                    let values_vec: Vec<&str> = values.map(String::as_str).collect();
 
                     if !values_vec.is_empty() {
                         // If there are multiple values, add them as a multi-value entry
@@ -173,22 +175,18 @@ impl App {
 
         let mut context = self.build_context()?;
 
-        match self.matches.subcommand() {
-            Some(("templates", tpl_params)) => {
-                self.add_params_to_context(&mut context, tpl_params);
-                controller.run_template_subcommand(&context)?;
-                Ok(true)
-            }
-            _ => {
-                let template_name = self
-                    .matches
-                    .get_one::<String>("template")
-                    .map(|s| s.as_str())
-                    .or_else(|| Some(&bootstrap.get_config().templates.default))
-                    .unwrap();
-                controller.format(&context, template_name)?;
-                Ok(true)
-            }
+        if let Some(("templates", tpl_params)) = self.matches.subcommand() {
+            Self::add_params_to_context(&mut context, tpl_params);
+            controller.run_template_subcommand(&context)?;
+            return Ok(true);
         }
+
+        let default_name = bootstrap.get_config().templates.default.as_str();
+        let template_name = self
+            .matches
+            .get_one::<String>("template")
+            .map_or(default_name, String::as_str);
+        controller.format(&context, template_name)?;
+        Ok(true)
     }
 }

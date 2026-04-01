@@ -116,7 +116,7 @@ impl TemplateFetcher {
     /// * `Result<bool>` - `Ok(true)` if the template was downloaded successfully, `Ok(false)` if the template already exists, or an error if the download failed.
     pub fn fetch_single(url: &str, templates_dir: &PathBuf, force: bool) -> Result<(bool, String)> {
         let result =
-            async { TemplateFetcher::download_file(&url, &templates_dir, force, true).await };
+            async { TemplateFetcher::download_file(url, templates_dir, force, true).await };
         match smol::block_on(result) {
             Ok(mut target_info) => {
                 if target_info.created {
@@ -210,18 +210,18 @@ impl TemplateFetcher {
         };
 
         let mut file = std::fs::File::create(&target_info.path)?;
-        let mut body = response.body_mut();
+        let body = response.body_mut();
 
         if show_progress {
             Self::download_with_progress(
-                &mut body,
+                body,
                 &mut file,
                 target_info.total_size,
                 &target_info.filename,
             )
             .await?;
         } else {
-            Self::download_without_progress(&mut body, &mut file).await?;
+            Self::download_without_progress(body, &mut file).await?;
         }
 
         if target_info.exists {
@@ -253,7 +253,7 @@ impl TemplateFetcher {
                     if force {
                         std::fs::rename(
                             &target_info.path,
-                            &target_info.path.with_file_name(&template_name),
+                            target_info.path.with_file_name(&template_name),
                         )?;
                     } else {
                         println!(
@@ -322,7 +322,7 @@ impl TemplateFetcher {
         url::Url::parse(url).ok().and_then(|parsed_url| {
             parsed_url
                 .path_segments()
-                .and_then(|segments| segments.last())
+                .and_then(|mut segments| segments.next_back())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.split('?').next().unwrap_or(s).to_string())
         })
@@ -361,7 +361,7 @@ impl TemplateFetcher {
         };
 
         // Get effective path
-        let mut target_info = TemplateFetcher::build_target_path(&final_url, &path)?;
+        let mut target_info = TemplateFetcher::build_target_path(&final_url, path)?;
 
         target_info.total_size = total_size;
         target_info.url = Some(final_url);

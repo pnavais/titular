@@ -1,9 +1,9 @@
 use std::env;
 use std::path::PathBuf;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-/// Wrapper for 'dirs' that treats MacOS more like Linux, by following the XDG specification.
+/// Wrapper for `dirs` that treats `MacOS` more like Linux, by following the XDG specification.
 /// The `XDG_CACHE_HOME` environment variable is checked first. `TITULAR_CONFIG_DIR`
 /// is then checked before the `XDG_CONFIG_HOME` environment variable.
 /// The fallback directory is `~/.config/titular`, respectively.
@@ -50,5 +50,5 @@ impl ProjectDirs {
     }
 }
 
-pub static PROJECT_DIRS: Lazy<ProjectDirs> =
-    Lazy::new(|| ProjectDirs::new().expect("Could not get home directory"));
+pub static PROJECT_DIRS: LazyLock<ProjectDirs> =
+    LazyLock::new(|| ProjectDirs::new().expect("Could not get home directory"));

@@ -5,12 +5,12 @@ mod directories;
 
 use app::App;
 use std::process;
-use titular::error::*;
+use titular::error::{default_error_handler, Result};
 
 /// Returns `Err(..)` upon fatal errors. Otherwise, returns `Ok(true)` on full success and
 /// `Ok(false)` if any intermediate errors occurred (were printed).
 fn run() -> Result<bool> {
-    let app = App::new()?;
+    let app = App::new();
     app.start()
 }
 

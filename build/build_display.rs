@@ -3,7 +3,6 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 
-use bincode;
 use build_print::println as build_println;
 use nu_ansi_term::Color::{Green, Red, Yellow};
 use sublime_color_scheme::ColorScheme;
@@ -11,7 +10,7 @@ use syntect::highlighting::{Theme, ThemeSet};
 use syntect::parsing::{SyntaxSet, SyntaxSetBuilder};
 use syntect::LoadingError;
 
-/// Extension trait for ThemeSet to add Sublime Text color scheme support
+/// Extension trait for `ThemeSet` to add Sublime Text color scheme support
 trait ThemeSetExt {
     /// Adds all Sublime Text color schemes from the given directory
     ///
@@ -73,12 +72,14 @@ impl ThemeSetExt for ThemeSet {
 
             if path.is_dir() {
                 self.load_themes(&path, extension)?;
-            } else if path.is_file() && path.extension().map_or(false, |ext| ext == extension) {
+            } else if path.is_file()
+                && path.extension().is_some_and(|ext| ext == extension)
+            {
                 match extension {
                     "tmTheme" => self.load_theme(&path)?,
                     "sublime-color-scheme" => self.load_color_scheme(&path)?,
                     _ => {}
-                };
+                }
             }
         }
         Ok(())
@@ -105,7 +106,7 @@ impl ThemeSetExt for ThemeSet {
             Green.paint(dir.display().to_string())
         );
 
-        let content = fs::read_to_string(&dir)?;
+        let content = fs::read_to_string(dir)?;
         if let Ok(color_scheme) = ColorScheme::from_str(&content) {
             let theme = Theme::try_from(color_scheme)?;
             if let Some(theme_name) = dir.file_stem().and_then(|s| s.to_str()) {
@@ -204,8 +205,8 @@ fn serialize_to_file<T: serde::Serialize>(
 /// 4. Setting up cargo rerun-if-changed directives
 ///
 /// # Returns
-/// A `Result` indicating success or failure
-pub fn build() -> Result<(), Box<dyn std::error::Error>> {
+/// Unit; errors loading assets are logged and do not fail the build script.
+pub fn build() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
 
@@ -220,7 +221,7 @@ pub fn build() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => {
                 build_println!(
                     "{}",
-                    Red.paint(format!("Error: Failed to load syntaxes: {}", e))
+                    Red.paint(format!("Error: Failed to load syntaxes: {e}"))
                 );
             }
         }
@@ -234,13 +235,11 @@ pub fn build() -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(e) => build_println!(
                 "{}",
-                Red.paint(format!("Error: Failed to load themes: {}", e))
+                Red.paint(format!("Error: Failed to load themes: {e}"))
             ),
         }
     }
 
     println!("cargo:rerun-if-changed=assets/syntaxes");
     println!("cargo:rerun-if-changed=assets/themes");
-
-    Ok(())
 }

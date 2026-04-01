@@ -30,21 +30,21 @@ impl TermSize {
     /// # Returns
     /// A tuple with the stored terminal width and height
     fn get_dimensions() -> Option<(usize, usize)> {
-        if cfg!(feature = "minimal") {
-            #[cfg(feature = "minimal")]
+        // Prefer `term_size` when `minimal` is enabled; otherwise use crossterm when `display` is on.
+        #[cfg(feature = "minimal")]
+        {
             term_size::dimensions()
-        } else if cfg!(feature = "display") {
-            #[cfg(feature = "display")]
-            {
-                crossterm::terminal::size()
-                    .ok()
-                    .map(|(w, h)| (w as usize, h as usize))
-            }
-            #[cfg(not(feature = "display"))]
-            {
-                None
-            }
-        } else {
+        }
+
+        #[cfg(all(feature = "display", not(feature = "minimal")))]
+        {
+            return crossterm::terminal::size()
+                .ok()
+                .map(|(w, h)| (w as usize, h as usize));
+        }
+
+        #[cfg(not(any(feature = "minimal", feature = "display")))]
+        {
             None
         }
     }
@@ -78,4 +78,4 @@ impl TermSize {
     }
 }
 
-pub static TERM_SIZE: Lazy<TermSize> = Lazy::new(|| TermSize::new());
+pub static TERM_SIZE: Lazy<TermSize> = Lazy::new(TermSize::new);

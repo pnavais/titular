@@ -24,7 +24,7 @@ impl ContextManager {
 
     /// Gets a mutable reference to the context
     /// This will wait for any other locks to be released
-    pub fn write(&self) -> Result<RwLockWriteGuard<Context>> {
+    pub fn write(&self) -> Result<RwLockWriteGuard<'_, Context>> {
         self.context
             .write()
             .map_err(|e| Error::Msg(format!("Failed to acquire write lock: {}", e)))
@@ -32,7 +32,7 @@ impl ContextManager {
 
     /// Gets a read-only reference to the context
     /// This will wait for any write locks to be released
-    pub fn read(&self) -> Result<RwLockReadGuard<Context>> {
+    pub fn read(&self) -> Result<RwLockReadGuard<'_, Context>> {
         self.context
             .read()
             .map_err(|e| Error::Msg(format!("Failed to acquire read lock: {}", e)))

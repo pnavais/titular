@@ -67,7 +67,7 @@ impl Dispatcher for URLDispatcher {
     fn process(url: &str) -> Result<Vec<String>> {
         match url.split_once(':') {
             Some(("github", _)) => GitHubDispatcher::process(url),
-            Some(("http", _)) | Some(("https", _)) => Self::dispatch_http(url),
+            Some(("http" | "https", _)) => Self::dispatch_http(url),
             Some((scheme, _)) => Err(Error::TemplateDownloadError(
                 url.to_string(),
                 format!(

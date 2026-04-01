@@ -39,12 +39,13 @@ pub mod error;
 pub mod fetcher;
 pub mod filters;
 pub mod formatter;
+pub mod functions;
 #[cfg(feature = "fetcher")]
 pub mod github;
 pub mod log;
 pub mod reader;
 pub mod string_utils;
-#[cfg(feature = "minimal")]
+#[cfg(any(feature = "minimal", feature = "display"))]
 pub mod term;
 #[cfg(feature = "display")]
 pub mod theme;

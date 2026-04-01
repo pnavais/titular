@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use std::fmt::Write as _;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
@@ -8,7 +9,7 @@ use titular::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 use titular::{
     config::{parse as config_parse, MainConfig},
     constants::template::DEFAULT_REMOTE_REPO,
-    error::*,
+    error::{ConfigType, Error, Result},
 };
 
 use crate::directories::PROJECT_DIRS;
@@ -59,8 +60,7 @@ impl BootStrap {
         {
             if let Err(e) = ctrlc::set_handler(titular::utils::cleanup) {
                 return Err(Error::CommandError(format!(
-                    "Failed to set Ctrl+C handler: {}",
-                    e
+                    "Failed to set Ctrl+C handler: {e}"
                 )));
             }
         }
@@ -69,9 +69,9 @@ impl BootStrap {
 
     /// Retrieves the templates directory using the following order :
     ///
-    /// - The directory path specified by the environment variable TITULAR_TEMPLATES_DIR
+    /// - The directory path specified by the environment variable `TITULAR_TEMPLATES_DIR`
     /// - The directory path specified in the main configuration file
-    /// - The default directory from PROJECT_DIRS
+    /// - The default directory from `PROJECT_DIRS`
     ///
     /// # Returns
     /// The path to the templates directory
@@ -89,7 +89,7 @@ impl BootStrap {
             None => PROJECT_DIRS.templates_dir().to_string_lossy().to_string(),
         };
 
-        let template_dir = match shellexpand::env(&templates_dir) {
+        let expanded_dir = match shellexpand::env(&templates_dir) {
             Ok(dir) => dir.to_string(),
             Err(e) => {
                 return Err(Error::InterpolationError {
@@ -99,7 +99,7 @@ impl BootStrap {
             }
         };
 
-        Ok(PathBuf::from(template_dir))
+        Ok(PathBuf::from(expanded_dir))
     }
 
     pub fn get_config(&self) -> &MainConfig {
@@ -150,14 +150,14 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
         #[cfg(feature = "fetcher")]
         {
             let mut data = config_data;
-            data.push_str(&format!("remote_repo   = \"{}\"", DEFAULT_REMOTE_REPO));
+            let _ = write!(data, "remote_repo   = \"{DEFAULT_REMOTE_REPO}\"");
             data
         }
         #[cfg(not(feature = "fetcher"))]
         config_data
     };
 
-    File::create(&config_file)?.write_all(config_data.as_bytes())?;
+    File::create(config_file)?.write_all(config_data.as_bytes())?;
     Ok(config_data)
 }
 

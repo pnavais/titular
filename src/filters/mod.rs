@@ -12,6 +12,7 @@ pub mod surround;
 
 pub use append::create_append_filter;
 pub use color::create_color_filter;
+pub use hide::create_hide_filter;
 pub use pad::create_pad_filter;
 pub use style::create_style_filter;
 pub use surround::create_surround_filter;

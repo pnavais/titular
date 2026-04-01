@@ -165,7 +165,7 @@ pub fn expand_to_visual_width(input: &str, target_width: usize) -> String {
     }
 
     // Calculate how many times we need to repeat the input
-    let repeat_count = (target_width + current_width - 1) / current_width;
+    let repeat_count = target_width.div_ceil(current_width);
     let mut result = String::with_capacity(input.len() * repeat_count);
 
     // Repeat the input
@@ -284,7 +284,6 @@ fn process_ansi_escapes(truncated: &str, original: &str, behavior: AnsiTruncateB
             // Collect remaining ANSI codes using ansi-parser
             let codes: String = remaining
                 .ansi_parse()
-                .into_iter()
                 .filter_map(|block| match block {
                     Output::Escape(seq) => Some(seq.to_string()),
                     _ => None,

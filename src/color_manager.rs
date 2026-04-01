@@ -45,7 +45,7 @@ impl ColorManager {
     /// # Returns
     ///
     /// A string with the color applied
-    pub fn format<'a>(colours: &Context, txt: &'a str, style: StyleFormat) -> String {
+    pub fn format(colours: &Context, txt: &str, style: StyleFormat) -> String {
         let mut style_obj = Style::new();
 
         // Apply foreground color if present

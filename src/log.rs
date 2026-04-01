@@ -3,7 +3,7 @@ use std::env;
 use once_cell::sync::Lazy;
 
 pub static DEBUG_ENABLED: Lazy<bool> = Lazy::new(|| {
-    env::var("TITULAR_DEBUG").map_or(false, |log_level| log_level.eq("true") || log_level.eq("1"))
+    env::var("TITULAR_DEBUG").is_ok_and(|log_level| log_level.eq("true") || log_level.eq("1"))
 });
 
 pub fn is_debug_enabled() -> bool {
@@ -28,7 +28,7 @@ where
     if *DEBUG_ENABLED {
         format!("{}{}", message.as_ref(), details.as_ref())
     } else {
-        format!("{}", message.as_ref())
+        message.as_ref().to_string()
     }
 }
 

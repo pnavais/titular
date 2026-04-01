@@ -150,9 +150,6 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Returns
     /// A `Result` indicating success or failure of the operation.
-    ///
-
-    /// ```
     pub fn list_templates(&self) -> Result<bool> {
         if self.input_dir.exists() {
             let templates = glob(&format!(
@@ -289,13 +286,11 @@ impl<'a> TemplatesController<'a> {
                     cause: e.to_string(),
                 }),
             };
-        } else {
-            println!(
-                "{}",
-                Yellow.paint(format!("Template \"{}\" not found", name))
-            );
         }
-
+        println!(
+            "{}",
+            Yellow.paint(format!("Template \"{}\" not found", name))
+        );
         Ok(true)
     }
 

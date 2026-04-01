@@ -9,6 +9,12 @@ pub struct TransformRegistry {
     order: Vec<Arc<Box<dyn Transform>>>,
 }
 
+impl Default for TransformRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransformRegistry {
     pub fn new() -> Self {
         Self {

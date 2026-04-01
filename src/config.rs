@@ -132,7 +132,7 @@ impl MainConfig {
         // Keep defaults as vars
         self.defaults.to_map().iter().for_each(|(k, v)| {
             self.vars
-                .insert(format!("defaults.{}", k.to_string()), v.to_string());
+                .insert(format!("defaults.{}", k), v.to_string());
         });
         // Add misc vars
         self.vars.insert(
@@ -160,7 +160,7 @@ impl FromStr for Display {
 
 pub fn parse(file_path: &PathBuf) -> Result<String> {
     let mut config_content = String::new();
-    File::open(&file_path)?.read_to_string(&mut config_content)?;
+    File::open(file_path)?.read_to_string(&mut config_content)?;
     Ok(config_content)
 }
 

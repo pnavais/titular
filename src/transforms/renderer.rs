@@ -9,6 +9,7 @@ use crate::config::TemplateConfig;
 use crate::constants::template::DEFAULT_TIME_FORMAT;
 use crate::error::*;
 use crate::filters::{append, color, hide, pad, style, surround};
+use crate::functions::exit_code;
 use crate::prelude::*;
 use crate::utils::safe_time_format;
 
@@ -22,6 +23,7 @@ static TERA: Lazy<Mutex<Tera>> = Lazy::new(|| {
     tera.register_filter("append", append::create_append_filter());
     tera.register_filter("pad", pad::create_pad_filter());
     tera.register_filter("hide", hide::create_hide_filter());
+    tera.register_function("get_last_exit_code", exit_code::get_last_exit_code);
     Mutex::new(tera)
 });
 
@@ -35,6 +37,12 @@ pub struct TemplateRenderer {}
 /// TemplateRenderer is a transform that renders a template string using the provided context.
 /// It uses the Tera template engine to render the template under the hood.
 /// It also registers the custom filters (color and style filters) to be used by the Tera engine.
+impl Default for TemplateRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TemplateRenderer {
     pub fn new() -> Self {
         Self {}
@@ -66,7 +74,7 @@ impl TemplateRenderer {
             .filter_map(|caps| caps.get(2).map(|m| m.as_str()))
             .flat_map(|args| args.split(','))
             .filter_map(|arg| arg.trim().split_once('=').map(|(_, v)| v.trim()))
-            .filter(|value| !matches!(value.chars().next(), Some('"') | Some('\'')))
+            .filter(|value| !matches!(value.chars().next(), Some('"' | '\'')))
             .for_each(|value| {
                 ContextManager::get()
                     .update(|ctx| {

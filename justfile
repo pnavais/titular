@@ -1,6 +1,7 @@
 alias b := build
 alias full := build-full
 alias min := build-min
+alias c := check
 
 build *args:
   cargo build {{args}}
@@ -11,10 +12,14 @@ build-min *args:
 clean:
   cargo clean
 full_clean: clean reset
+fmt:
+  cargo fmt --all
 lint:
-  cargo clippy -- -W clippy:all -W clippy::pedantic
+  cargo clippy -- -W clippy::all -W clippy::pedantic
+check:
+  cargo fmt --all -- --check && cargo clippy -- -W clippy::all -W clippy::pedantic && cargo test
 lint-full:
-  cargo clippy --no-default-features --features full_application -- -W clippy:all -W clippy::pedantic
+  cargo clippy --no-default-features --features full_application -- -W clippy::all -W clippy::pedantic
 release:
   cargo build --release
 reset:

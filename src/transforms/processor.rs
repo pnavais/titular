@@ -132,7 +132,7 @@ impl TextProcessor {
 
         // First collect all matches that need to be removed
         let to_remove: Vec<(usize, usize)> = re
-            .captures_iter(&result)
+            .captures_iter(result)
             .filter_map(|cap| {
                 let matched = cap.get(0)?;
                 let content = cap.get(1)?;
@@ -168,7 +168,7 @@ impl TextProcessor {
         let (groups, total_group_length) = PAD_PATTERN
             .captures_iter(content) // Use original content for matching
             .filter_map(|cap| {
-                cap.get(0).and_then(|matched| {
+                cap.get(0).map(|matched| {
                     // For empty pad(), content will be None
                     let pad_content = cap.get(1).map_or("", |m| m.as_str()).to_string();
 
@@ -177,14 +177,14 @@ impl TextProcessor {
                     let group_length = measure_text_width(&stripped_group);
 
                     // Include all groups, empty or not
-                    Some((
+                    (
                         MatchedGroup {
                             content: pad_content,
                             start: matched.start(),
                             end: matched.end(),
                         },
                         group_length,
-                    ))
+                    )
                 })
             })
             .fold(

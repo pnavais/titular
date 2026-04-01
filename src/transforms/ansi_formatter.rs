@@ -6,6 +6,12 @@ const RESET_CODE: &str = "\x1b[0m";
 
 pub struct AnsiFormatter;
 
+impl Default for AnsiFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnsiFormatter {
     pub fn new() -> Self {
         Self
@@ -27,7 +33,7 @@ impl AnsiFormatter {
 
                     if escape_str == RESET_CODE {
                         // Full reset - pop last element
-                        if let Some(_) = stack.pop_back() {
+                        if stack.pop_back().is_some() {
                             // After reset, reapply remaining stack in order
                             for code in stack.iter() {
                                 result.push_str(code);

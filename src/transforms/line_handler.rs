@@ -5,6 +5,12 @@ use console::Term;
 /// Handles line endings based on context flags
 pub struct LineHandler;
 
+impl Default for LineHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LineHandler {
     pub fn new() -> Self {
         Self
@@ -27,7 +33,7 @@ impl Transform for LineHandler {
         Ok(format!(
             "{}{}",
             text,
-            ctx.is_active("skip-newline").then_some("").unwrap_or("\n")
+            if ctx.is_active("skip-newline") { "" } else { "\n" }
         ))
     }
 }

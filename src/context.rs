@@ -423,7 +423,7 @@ impl Context {
             }
         }
         println!("\nRegistry Items:");
-        for (key, _) in &self.registry.items {
+        for key in self.registry.items.keys() {
             println!("  {} = <object>", key);
         }
         println!("------------------------\n");
