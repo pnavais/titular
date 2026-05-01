@@ -42,7 +42,8 @@ pub fn build_app(interactive_output: bool) -> Command {
         .long_help(
             "Explicitly sets the text messages to use in the pattern. \
                     When specifying multiple text options, \
-                    the texts will be replaced following the same occurrence order (m2, m3, ...).",
+                    the texts will be replaced following the same occurrence order (m2, m3, ...). \
+                    With -e, backslash escapes in each value are interpreted (\\n, \\t, \\e, etc.).",
         ),
     )
     .arg(
@@ -51,7 +52,8 @@ pub fn build_app(interactive_output: bool) -> Command {
             "Explicitly specify the filler characters to use in the pattern. \
                     If not specified, the default filler specified in the pattern will be used. \
                     When specifying multiple filler options, \
-                    the latter will be assigned following the same occurrence order (f2, f3, ...).",
+                    the latter will be assigned following the same occurrence order (f2, f3, ...). \
+                    With -e, backslash escapes are interpreted like -m.",
         ),
     )
     .arg(
@@ -74,15 +76,26 @@ pub fn build_app(interactive_output: bool) -> Command {
         arg!(-w --width <VALUE> "Specifies the maximum % width of the terminal to use.")
         .long_help(
             "Explicitly specify the width percentage (%) of the maxium width \
-                    of the terminal to use (defaults to 100%).",
+                    of the terminal to use. When omitted, the value is resolved \
+                    from defaults.width in the main configuration.",
         )
-        .value_parser(value_parser!(u8).range(0..=100))
-        .default_value("100"),
+        .value_parser(value_parser!(u8).range(0..=100)),
     )
     .arg(
         arg!(--"with-time" "Adds a trailing timestamp.")
         .long_help("Adds a timestamp to the end of the pattern using the time format
                     configured in the settings (defaults to : [%H:%M:%S].")
+    ).arg(
+        Arg::new("interpret_escapes")
+            .short('e')
+            .long("interpret-escapes")
+            .action(ArgAction::SetTrue)
+            .help("Interpret \\n, \\t, \\e, etc. in -m and -f (echo -e style).")
+            .long_help(
+                "When set, values passed to -m and -f are processed like echo -e: \
+                    \\n \\r \\t \\\\ \\\" \\', and \\e / \\E (ASCII ESC, for ANSI sequences). \
+                    Without this flag, arguments are used exactly as received from the shell.",
+            ),
     ).arg(
         arg!(-n --"no-newline" "Supress new line after the generated title.")
         .long_help("Prevents writing a carriage return after generating the title.")

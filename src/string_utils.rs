@@ -55,6 +55,48 @@ pub fn is_visually_empty(s: &str) -> bool {
     })
 }
 
+/// Interprets common C-style backslash escapes in CLI argument strings (similar in spirit
+/// to `echo -e`).
+///
+/// Shells usually pass `-m "a\nb"` as the three characters `a`, `\`, `n` (not a newline).
+/// Maps `\\`, `\n`, `\r`, `\t`, `\"`, `\'`, and `\e` / `\E` (ASCII ESC, `0x1B`, for ANSI
+/// sequences). Any other `\x` keeps both characters. A trailing `\` is kept as `\`.
+///
+/// # Examples
+///
+/// ```
+/// use titular::string_utils::unescape_cli_escapes;
+///
+/// assert_eq!(unescape_cli_escapes(r"a\nb"), "a\nb");
+/// assert_eq!(unescape_cli_escapes(r"a\tb"), "a\tb");
+/// assert_eq!(unescape_cli_escapes(r"C:\\dir"), "C:\\dir");
+/// ```
+#[must_use]
+pub fn unescape_cli_escapes(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut it = input.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match it.next() {
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some('t') => out.push('\t'),
+            Some('e' | 'E') => out.push('\x1b'),
+            Some('"') => out.push('"'),
+            Some('\'') => out.push('\''),
+            Some('\\') | None => out.push('\\'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+        }
+    }
+    out
+}
+
 /// Prints a string with its raw ANSI codes
 ///
 /// # Arguments
@@ -310,6 +352,22 @@ fn process_ansi_escapes(truncated: &str, original: &str, behavior: AnsiTruncateB
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_unescape_cli_escapes() {
+        assert_eq!(unescape_cli_escapes(""), "");
+        assert_eq!(unescape_cli_escapes("plain"), "plain");
+        assert_eq!(unescape_cli_escapes(r"a\nb"), "a\nb");
+        assert_eq!(unescape_cli_escapes(r"a\tb"), "a\tb");
+        assert_eq!(unescape_cli_escapes(r"a\rb"), "a\rb");
+        assert_eq!(unescape_cli_escapes(r"a\eb"), "a\x1bb");
+        assert_eq!(unescape_cli_escapes(r"a\Eb"), "a\x1bb");
+        assert_eq!(unescape_cli_escapes(r"\\"), "\\");
+        assert_eq!(unescape_cli_escapes(r"C:\\path"), "C:\\path");
+        assert_eq!(unescape_cli_escapes(r#"quote\"s"#), "quote\"s");
+        assert_eq!(unescape_cli_escapes(r"\z"), r"\z");
+        assert_eq!(unescape_cli_escapes("\\"), "\\");
+    }
 
     #[test]
     fn test_expand_to_width() {

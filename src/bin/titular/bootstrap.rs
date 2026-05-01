@@ -1,16 +1,17 @@
 use chrono::prelude::*;
+#[cfg(feature = "fetcher")]
 use std::fmt::Write as _;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
 use titular::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 
-#[cfg(feature = "fetcher")]
 use titular::{
     config::{parse as config_parse, MainConfig},
-    constants::template::DEFAULT_REMOTE_REPO,
     error::{ConfigType, Error, Result},
 };
+#[cfg(feature = "fetcher")]
+use titular::constants::template::DEFAULT_REMOTE_REPO;
 
 use crate::directories::PROJECT_DIRS;
 

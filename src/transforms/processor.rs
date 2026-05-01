@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::string_utils::expand_to_visual_width;
 use crate::term::TERM_SIZE;
+use crate::context::Context;
 use console::{measure_text_width, strip_ansi_codes};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
@@ -53,6 +54,29 @@ impl TextProcessor {
         Self {
             get_width: Arc::new(Mutex::new(width_provider)),
         }
+    }
+
+    /// Parses a width percentage from config/context values.
+    ///
+    /// Supported values:
+    /// - "full" => 100
+    /// - "half" => 50
+    /// - numeric string => clamped to [0, 100]
+    fn parse_width_percentage(width: &str) -> u8 {
+        let normalized = width.trim().to_ascii_lowercase();
+        let normalized = normalized.strip_suffix('%').unwrap_or(&normalized);
+        match normalized {
+            "full" => 100,
+            "half" => 50,
+            _ => normalized
+                .parse::<i16>()
+                .map_or(100, |n| n.clamp(0, 100) as u8),
+        }
+    }
+
+    fn resolve_width_percentage(ctx: &Context) -> Option<u8> {
+        let raw_width = ctx.get("width").or_else(|| ctx.get("defaults.width"));
+        raw_width.map(Self::parse_width_percentage)
     }
 
     /// Process the content with padding and line wrapping
@@ -342,8 +366,7 @@ impl TextProcessor {
 impl Transform for TextProcessor {
     fn transform(&self, text: &str) -> Result<String> {
         let ctx = ContextManager::get().read()?;
-        // Check if context has a width parameter
-        if let Some(width) = ctx.get("width").and_then(|w| w.parse::<u8>().ok()) {
+        if let Some(width) = Self::resolve_width_percentage(&ctx) {
             *self.get_width.lock().unwrap() = Box::new(move || {
                 let term_width = Self::default_width()();
                 (term_width * width as usize) / 100
@@ -359,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_basic() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!(
             "{}hello{} world {}foo{}",
             padding::START,
@@ -376,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_empty() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!("{}{}", padding::START, padding::END);
         let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(
@@ -396,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_with_ansi() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!(
             "{}\x1b[31mhello\x1b[0m{} \x1b[32mworld\x1b[0m {}foo{}",
             padding::START,
@@ -413,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_with_emoji() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!(
             "{}hello 🦀{} world {}foo{}",
             padding::START,
@@ -430,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_with_ansi_and_emoji() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!(
             "{}\x1b[31mhello 🦀\x1b[0m{} \x1b[32mworld\x1b[0m {}foo{}",
             padding::START,
@@ -447,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_no_markers() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = "hello world";
         let (groups, text_width) = TextProcessor::extract_padding_groups(input);
         assert_eq!(groups.len(), 0);
@@ -456,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_unmatched_start() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!("{}hello world", padding::START);
         let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 0);
@@ -465,7 +488,7 @@ mod tests {
 
     #[test]
     fn test_extract_padding_groups_unmatched_end() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let input = format!("hello world{}", padding::END);
         let (groups, text_width) = TextProcessor::extract_padding_groups(&input);
         assert_eq!(groups.len(), 0);
@@ -498,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_remove_empty_pads() {
-        let processor = TextProcessor::default();
+        let _processor = TextProcessor::default();
         let mut input = format!(
             "Hello {}{} World {}{} Test",
             padding::START,
@@ -526,5 +549,19 @@ mod tests {
                 padding::END
             )
         );
+    }
+
+    #[test]
+    fn test_parse_width_percentage_keywords() {
+        assert_eq!(TextProcessor::parse_width_percentage("full"), 100);
+        assert_eq!(TextProcessor::parse_width_percentage("half"), 50);
+    }
+
+    #[test]
+    fn test_parse_width_percentage_clamped_numeric() {
+        assert_eq!(TextProcessor::parse_width_percentage("-10"), 0);
+        assert_eq!(TextProcessor::parse_width_percentage("42"), 42);
+        assert_eq!(TextProcessor::parse_width_percentage("10%"), 10);
+        assert_eq!(TextProcessor::parse_width_percentage("500"), 100);
     }
 }

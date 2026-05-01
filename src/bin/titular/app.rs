@@ -6,6 +6,7 @@ use titular::{
     context::Context,
     controller::TemplatesController,
     error::{Error, Result},
+    string_utils::unescape_cli_escapes,
 };
 
 pub struct App {
@@ -35,6 +36,7 @@ impl App {
     /// A `Result` containing the context.
     fn build_context(&self) -> Result<Context> {
         let mut context = Context::new();
+        let interpret_escapes = self.matches.get_flag("interpret_escapes");
 
         context.insert(
             "template",
@@ -43,24 +45,34 @@ impl App {
                 .map_or("", String::as_str),
         );
         if self.matches.contains_id("message") {
-            context.insert_multi(
-                "m",
-                self.matches
-                    .get_many::<String>("message")
-                    .unwrap()
-                    .map(String::as_str)
-                    .collect(),
-            );
+            let messages: Vec<String> = self
+                .matches
+                .get_many::<String>("message")
+                .unwrap()
+                .map(|s| {
+                    if interpret_escapes {
+                        unescape_cli_escapes(s)
+                    } else {
+                        s.clone()
+                    }
+                })
+                .collect();
+            context.insert_multi("m", messages.iter().map(String::as_str).collect());
         }
         if self.matches.contains_id("filler") {
-            context.insert_multi(
-                "f",
-                self.matches
-                    .get_many::<String>("filler")
-                    .unwrap()
-                    .map(String::as_str)
-                    .collect(),
-            );
+            let fillers: Vec<String> = self
+                .matches
+                .get_many::<String>("filler")
+                .unwrap()
+                .map(|s| {
+                    if interpret_escapes {
+                        unescape_cli_escapes(s)
+                    } else {
+                        s.clone()
+                    }
+                })
+                .collect();
+            context.insert_multi("f", fillers.iter().map(String::as_str).collect());
         }
         if self.matches.contains_id("color") {
             context.insert_multi(
@@ -88,7 +100,7 @@ impl App {
                 }
             }
         }
-        if self.matches.contains_id("width") {
+        if let Some(ValueSource::CommandLine) = self.matches.value_source("width") {
             context.insert(
                 "width",
                 self.matches
