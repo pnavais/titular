@@ -23,6 +23,8 @@ static TERA: std::sync::LazyLock<Mutex<Tera>> = std::sync::LazyLock::new(|| {
     tera.register_filter("append", append::create_append_filter());
     tera.register_filter("pad", pad::create_pad_filter());
     tera.register_filter("hide", hide::create_hide_filter());
+    #[cfg(feature = "display")]
+    tera.register_filter("markup", crate::filters::markup::create_markup_filter());
     tera.register_function("get_last_exit_code", exit_code::get_last_exit_code);
     Mutex::new(tera)
 });

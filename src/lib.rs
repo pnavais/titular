@@ -49,6 +49,8 @@ pub mod string_utils;
 pub mod term;
 #[cfg(feature = "display")]
 pub mod theme;
+#[cfg(feature = "display")]
+pub mod theme_palette;
 pub mod transforms;
 pub mod utils;
 pub mod writer;

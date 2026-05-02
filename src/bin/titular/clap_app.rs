@@ -25,19 +25,30 @@ pub fn build_app(interactive_output: bool) -> Command {
         .placeholder(AnsiColor::Green.on_default());
 
     let mut app = Command::new(crate_name!())
-    .styles(styles)
-    .version(crate_version!())
-    .about(crate_description!())
-    .color(color_when)
-    .allow_hyphen_values(true)
-    .arg(
-        arg!(-t --template <VALUE> "Template to use for the title")
-        .long_help(
-            "Template to be rendered with the custom message. Must match a name \
+        .styles(styles)
+        .version(crate_version!())
+        .about(crate_description!())
+        .color(color_when)
+        .allow_hyphen_values(true)
+        .arg(
+            arg!(-t --template <VALUE> "Template to use for the title").long_help(
+                "Template to be rendered with the custom message. Must match a name \
                     inside the templates directory ($TITULAR_TEMPLATE_DIR).",
-        ),
-    )
-    .arg(
+            ),
+        );
+
+    #[cfg(feature = "display")]
+    {
+        app = app.arg(
+            Arg::new("theme")
+                .short('T')
+                .long("theme")
+                .value_name("NAME")
+                .help("Syntax highlighting theme for theme_* palette vars and fancy preview."),
+        );
+    }
+
+    app = app.arg(
         arg!(-m --message <VALUE> ... "Sets the message in the title used.")
         .long_help(
             "Explicitly sets the text messages to use in the pattern. \

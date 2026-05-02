@@ -6,6 +6,8 @@
 pub mod append;
 pub mod color;
 pub mod hide;
+#[cfg(feature = "display")]
+pub mod markup;
 pub mod pad;
 pub mod style;
 pub mod surround;

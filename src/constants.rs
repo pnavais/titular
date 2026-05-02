@@ -14,12 +14,14 @@ pub mod template {
     /// Default template content (basic template)
     pub const DEFAULT_TEMPLATE: &str = "[details]\n\
                                 name    = \"@name\"\n\
-                                version = \"1.0\"\n\
+                                version = \"1.1\"\n\
                                 author  = \"@author\"\n\
                                 url     = \"@url\"\n\n\
                                 [vars]\n\
-                                main_color = \"green\"\n\
-                                message_color = \"$main_color\"\n\
+                                fallback_accent = \"green\"\n\
+                                fallback_msg = \"green\"\n\
+                                main_color = \"${theme_keyword:fallback_accent}\"\n\
+                                message_color = \"${theme_foreground:fallback_msg}\"\n\
                                 white=\"RGB(255,255,255)\"\n\
                                 f=\"*\"\n\
                                 fb=\"$f\"\n\

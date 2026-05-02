@@ -3,6 +3,10 @@ use crate::{
     config::MainConfig, constants::template::DEFAULT_TEMPLATE_NAME, context::Context, debug,
     reader::TemplateReader, transforms::TransformManager, writer::TemplateWriter,
 };
+#[cfg(feature = "display")]
+use crate::{
+    constants::template::DEFAULT_THEME, theme::ThemeManager, theme_palette::palette_from_theme,
+};
 use std::io::{stdout, Write};
 
 #[cfg(feature = "fetcher")]
@@ -17,6 +21,31 @@ impl<'a> TemplateFormatter<'a> {
     #[must_use]
     pub fn new(input_dir: &'a std::path::PathBuf, config: &'a MainConfig) -> Self {
         Self { input_dir, config }
+    }
+
+    /// Fills `theme_*` RGB vars from the resolved syntect theme (`display` feature).
+    #[cfg(feature = "display")]
+    fn inject_theme_palette_vars(ctx: &mut Context) {
+        let Ok(tm) = ThemeManager::init() else {
+            return;
+        };
+        let theme_name = ctx
+            .get("theme")
+            .or_else(|| ctx.get("defaults.display_theme"))
+            .unwrap_or(DEFAULT_THEME);
+
+        let th = match tm.resolve_theme(theme_name) {
+            Some(th) => th,
+            None => {
+                let Some(th) = tm.resolve_theme(DEFAULT_THEME) else {
+                    return;
+                };
+                tm.warn_theme_not_found_using_fallback(theme_name, DEFAULT_THEME);
+                th
+            }
+        };
+
+        palette_from_theme(th).insert_into(ctx);
     }
 
     /// Performs the rendering of the template using the template formatter.
@@ -42,6 +71,8 @@ impl<'a> TemplateFormatter<'a> {
         crate::context_manager::ContextManager::get().update(|ctx| {
             ctx.append_from(context);
             ctx.append(&self.config.vars);
+            #[cfg(feature = "display")]
+            Self::inject_theme_palette_vars(ctx);
             ctx.append(&template_payload.vars);
             ctx.store_object("template_config", template_payload);
         })?;

@@ -3,6 +3,7 @@ use syntect::highlighting::{Theme, ThemeSet};
 
 use crate::{error::Result, utils};
 use nu_ansi_term::Color::{Green, Yellow};
+use std::io::{self, Write};
 
 /// Ranks installed theme names for a typo or partial query (used for CLI hints).
 ///
@@ -134,6 +135,24 @@ impl ThemeManager {
             self.theme_set.themes.keys().map(String::as_str),
             limit,
         )
+    }
+
+    /// Writes the same stderr warning and fuzzy “Did you mean?” hints used by fancy preview
+    /// when `requested` is not a known theme and the caller falls back to `fallback_name`.
+    pub fn warn_theme_not_found_using_fallback(&self, requested: &str, fallback_name: &str) {
+        if requested == fallback_name {
+            return;
+        }
+        let msg = format!(
+            "WARN: syntax highlighting theme '{}' was not found; using default '{}'.",
+            requested, fallback_name
+        );
+        let _ = writeln!(io::stderr(), "{}", Yellow.paint(msg));
+        let hints = self.suggest_theme_names(requested, 3);
+        if !hints.is_empty() {
+            let hint_msg = format!("      Did you mean: {}?", hints.join(", "));
+            let _ = writeln!(io::stderr(), "{}", Yellow.paint(hint_msg));
+        }
     }
 
     /// Gets a theme from the theme set.

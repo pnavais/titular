@@ -44,6 +44,10 @@ impl App {
                 .get_one::<String>("template")
                 .map_or("", String::as_str),
         );
+        #[cfg(feature = "display")]
+        if let Some(theme) = self.matches.get_one::<String>("theme") {
+            context.insert("theme", theme.as_str());
+        }
         if self.matches.contains_id("message") {
             let messages: Vec<String> = self
                 .matches
