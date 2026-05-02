@@ -97,9 +97,40 @@ Titular supports a variety of themes:
 
 Titular can be configured through:
 
-1. Command-line arguments
-2. Configuration file (`~/.config/titular/config.toml`)
-3. Environment variables
+1. Command-line arguments (highest precedence)
+2. Environment variables that inject default CLI flags (see below)
+3. Configuration file (`~/.config/titular/titular.toml` under the config directory; see `TITULAR_CONFIG_DIR`)
+
+### Environment variables as default flags
+
+After the program name, titular expands a fixed set of environment variables into synthetic `--long=value` or flag tokens, then appends your real command-line arguments (same idea as [bat](https://github.com/sharkdp/bat)). **Anything you pass on the CLI wins** over env-derived defaults.
+
+For each mapped variable, titular **does not inject** the corresponding flag if you already used it in the **global** argument list (everything before a `templates` subcommand). That avoids Clap errors such as passing both `TITULAR_WIDTH=50` and `-w 60`. Env defaults still apply to runs like `titular templates list` when those flags are absent before `templates`.
+
+On Windows, argv is built with [`wild`](https://crates.io/crates/wild) so shell-style globs are expanded like on Unix.
+
+**Value options** (unset variables are ignored):
+
+| Variable | Effect |
+| -------- | ------ |
+| `TITULAR_TEMPLATE` | `--template=<value>` |
+| `TITULAR_WIDTH` | `--width=<value>` (0–100) |
+| `TITULAR_THEME` | `--theme=<value>` (requires `display` feature) |
+| `BAT_THEME` | `--theme=<value>` if `TITULAR_THEME` is unset (`display` only) |
+
+**Boolean-style flags** — the flag is added only when the variable is set and trims to `1`, `true`, or `yes` (ASCII case-insensitive):
+
+| Variable | Effect |
+| -------- | ------ |
+| `TITULAR_INTERPRET_ESCAPES` | `--interpret-escapes` |
+| `TITULAR_NO_NEWLINE` | `--no-newline` |
+| `TITULAR_WITH_TIME` | `--with-time` |
+| `TITULAR_HIDE` | `--hide` |
+| `TITULAR_CLEAR` | `--clear` |
+
+These apply to the **top-level** command only, not `titular templates …` subcommands.
+
+Other variables (for example `TITULAR_CONFIG_DIR`, pager settings, `TITULAR_DEBUG`) keep their existing behavior.
 
 Example configuration:
 

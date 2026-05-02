@@ -1,6 +1,6 @@
 use std::io::IsTerminal;
 
-use crate::{bootstrap::BootStrap, clap_app};
+use crate::{bootstrap::BootStrap, clap_app, env_cli};
 use clap::{parser::ValueSource, ArgMatches};
 use titular::{
     context::Context,
@@ -26,7 +26,14 @@ impl App {
     }
 
     pub fn matches(interactive_output: bool) -> ArgMatches {
-        clap_app::build_app(interactive_output).get_matches()
+        let mut iter = wild::args_os();
+        let exe = iter.next().unwrap_or_default();
+        let user_args: Vec<_> = iter.collect();
+        let mut args = vec![exe];
+        args.extend(env_cli::get_args_from_env_vars_filtered(&user_args));
+        args.extend(user_args);
+        clap_app::build_app(interactive_output)
+            .get_matches_from(args)
     }
 
     /// Creates the context with the matched information supplied in the command

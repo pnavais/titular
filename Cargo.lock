@@ -2289,6 +2289,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2450,6 +2459,7 @@ dependencies = [
  "strum_macros",
  "sublime-color-scheme",
  "syntect",
+ "temp-env",
  "tempfile",
  "tera",
  "term_size",
@@ -2459,6 +2469,7 @@ dependencies = [
  "unicode-segmentation",
  "url",
  "whoami",
+ "wild",
  "zip",
 ]
 
@@ -2813,6 +2824,15 @@ dependencies = [
  "redox_syscall",
  "wasite",
  "web-sys",
+]
+
+[[package]]
+name = "wild"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3131afc8c575281e1e80f36ed6a092aa502c08b18ed7524e86fbbb12bb410e1"
+dependencies = [
+ "glob",
 ]
 
 [[package]]

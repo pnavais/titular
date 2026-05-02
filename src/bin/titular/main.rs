@@ -2,6 +2,7 @@ mod app;
 mod bootstrap;
 mod clap_app;
 mod directories;
+mod env_cli;
 
 use app::App;
 use std::process;
