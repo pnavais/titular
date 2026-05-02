@@ -1,6 +1,6 @@
 use clap::{
     arg,
-    builder::{styling::AnsiColor, Styles},
+    builder::{styling::AnsiColor, PossibleValuesParser, Styles},
     crate_description, crate_name, crate_version, value_parser, Arg, ArgAction, ColorChoice,
     Command,
 };
@@ -191,27 +191,37 @@ fn configure_subcommands() -> Command {
 /// # Returns
 /// A `Command` object representing the list command.
 fn build_list_command() -> Command {
-    let list_cmd = Command::new("list")
-    .alias("ls")
-    .about("List the current installed templates.")
-    .long_about(
-        "Displays the currently installed templates from \
-            the templates directory (default: the templates folder inside configuration directory).",
-    );
+    let output_fmt_arg = Arg::new("output")
+        .short('o')
+        .long("output")
+        .value_name("FORMAT")
+        .value_parser(PossibleValuesParser::new(["txt", "json"]))
+        .help("Output format: names only (txt), or JSON (json). Default is the interactive tree.");
+
+    let cmd = Command::new("list")
+        .alias("ls")
+        .about("List the current installed templates.")
+        .long_about(
+            "Displays the currently installed templates from \
+            the templates directory (default: the templates folder inside configuration directory). \
+            Use -o txt or -o json for plain machine-readable output.",
+        )
+        .arg(output_fmt_arg);
 
     #[cfg(feature = "display")]
-    {
-        let mut cmd = list_cmd;
-        cmd = cmd.arg(
-            arg!(-t --themes "List available syntax highlighting themes")
-            .long_help("Displays all available syntax highlighting themes that can be used with the display feature."),
-        );
-        cmd
-    }
-    #[cfg(not(feature = "display"))]
-    {
-        list_cmd
-    }
+    let cmd = cmd.arg(
+        Arg::new("themes")
+            .short('l')
+            .short_alias('t')
+            .long("themes")
+            .action(ArgAction::SetTrue)
+            .help("List embedded syntax-highlighting themes instead of template files")
+            .long_help(
+                "List embedded syntax-highlighting theme names (`-l` or `-t`; requires `display`).",
+            ),
+    );
+
+    cmd
 }
 
 /// Builds the show command with optional themes argument when display feature is enabled

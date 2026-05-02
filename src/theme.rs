@@ -76,7 +76,10 @@ pub fn theme_name_for_template_palette(ctx: &Context) -> Option<&str> {
 pub fn theme_name_for_display_preview(ctx: &Context) -> Option<&str> {
     ctx.get("theme")
         .filter(|s| theme_token_is_set(s))
-        .or_else(|| ctx.get("defaults.display_theme").filter(|s| theme_token_is_set(s)))
+        .or_else(|| {
+            ctx.get("defaults.display_theme")
+                .filter(|s| theme_token_is_set(s))
+        })
 }
 
 pub struct ThemeManager {
@@ -120,12 +123,8 @@ impl ThemeManager {
     /// # Errors
     /// Currently always returns `Ok(())`; reserved for future fallible output paths.
     pub fn list_themes(&self) -> Result<()> {
-        let themes: Vec<&str> = self
-            .theme_set
-            .themes
-            .keys()
-            .map(std::string::String::as_str)
-            .collect();
+        let names = self.theme_names_sorted();
+        let themes: Vec<&str> = names.iter().map(String::as_str).collect();
         utils::print_tree_with_prefixes(
             &themes,
             "theme",
@@ -136,6 +135,14 @@ impl ThemeManager {
             |s| Green.paint(s).to_string(),
         );
         Ok(())
+    }
+
+    /// Theme keys sorted case-insensitively (for `templates ls --themes` and `-o txt|json`).
+    #[must_use]
+    pub fn theme_names_sorted(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.theme_set.themes.keys().cloned().collect();
+        names.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+        names
     }
 
     /// Resolves a theme by exact map key first, then ASCII case-insensitive key match.

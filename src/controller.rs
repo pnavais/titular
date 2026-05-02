@@ -11,6 +11,7 @@ use crate::{
 };
 
 use crate::utils;
+use serde_json::json;
 
 #[cfg(feature = "fetcher")]
 use crate::fetcher::TemplateFetcher;
@@ -20,6 +21,30 @@ use crate::theme::ThemeManager;
 
 use glob::glob;
 use nu_ansi_term::Color::{Green, Red, Yellow};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ListOutputFormat {
+    Tree,
+    Txt,
+    Json,
+}
+
+impl ListOutputFormat {
+    fn from_context(ctx: &Context) -> Self {
+        match ctx.get("output") {
+            Some("txt") => ListOutputFormat::Txt,
+            Some("json") => ListOutputFormat::Json,
+            _ => ListOutputFormat::Tree,
+        }
+    }
+}
+
+fn template_stem(file_name: &str) -> String {
+    file_name
+        .strip_suffix(DEFAULT_TEMPLATE_EXT)
+        .unwrap_or(file_name)
+        .to_string()
+}
 
 pub struct TemplatesController<'a> {
     pub input_dir: PathBuf,
@@ -53,16 +78,7 @@ impl<'a> TemplatesController<'a> {
     pub fn run_template_subcommand(&self, context: &Context) -> Result<bool> {
         match context.get("subcommand") {
             Some(cmd) => match cmd {
-                "list" => {
-                    #[cfg(feature = "display")]
-                    {
-                        self.list(context)
-                    }
-                    #[cfg(not(feature = "display"))]
-                    {
-                        self.list()
-                    }
-                }
+                "list" => self.list(context),
                 "create" | "edit" | "remove" | "show" => {
                     let template_name = context
                         .get("template")
@@ -103,18 +119,12 @@ impl<'a> TemplatesController<'a> {
         }
     }
 
-    /// Lists the templates or themes currently available in the binary.
+    /// Lists installed templates (default), or embedded themes when `--themes` is set (`display`).
     ///
-    /// This function retrieves the list of templates or themes from the binary and prints them to the console.
+    /// Honors `-o txt|json` for plain lines or JSON (`templates`, `themes` arrays respectively).
     ///
     /// # Arguments
-    /// * `context` - The context containing the subcommand and template name. Only used when "display" feature is enabled.
-    ///
-    /// # Returns
-    /// A `Result` indicating success or failure of the operation.
-    ///
-    /// # Errors
-    /// Returns an error if listing themes or templates fails.
+    /// * `context` — Must include `subcommand=list`; optional `themes` flag and `output` format.
     ///
     /// # Examples
     /// ```
@@ -124,28 +134,19 @@ impl<'a> TemplatesController<'a> {
     /// let config = MainConfig::default();
     /// let input_dir = PathBuf::from("templates");
     /// let controller = TemplatesController::new(input_dir, &config);
-    /// let context = Context::new();
+    /// let mut context = Context::new();
+    /// context.insert("subcommand", "list");
     ///
-    /// #[cfg(feature = "display")]
     /// let result = controller.list(&context);
-    /// #[cfg(not(feature = "display"))]
-    /// let result = controller.list();
-    ///
     /// assert!(result.is_ok());
     /// ```
-    #[cfg(feature = "display")]
     pub fn list(&self, context: &Context) -> Result<bool> {
+        let fmt = ListOutputFormat::from_context(context);
+        #[cfg(feature = "display")]
         if context.is_active("themes") {
-            return self.list_themes();
+            return self.list_themes(fmt);
         }
-        self.list_templates()
-    }
-
-    /// # Errors
-    /// Returns an error if listing templates fails.
-    #[cfg(not(feature = "display"))]
-    pub fn list(&self) -> Result<bool> {
-        self.list_templates()
+        self.list_templates(fmt)
     }
 
     /// Lists the themes currently available in the binary.
@@ -158,8 +159,22 @@ impl<'a> TemplatesController<'a> {
     /// # Errors
     /// Returns an error if themes cannot be loaded or listed.
     #[cfg(feature = "display")]
-    pub fn list_themes(&self) -> Result<bool> {
-        ThemeManager::init()?.list_themes()?;
+    fn list_themes(&self, fmt: ListOutputFormat) -> Result<bool> {
+        let mgr = ThemeManager::init()?;
+        match fmt {
+            ListOutputFormat::Tree => {
+                mgr.list_themes()?;
+            }
+            ListOutputFormat::Txt => {
+                for name in mgr.theme_names_sorted() {
+                    println!("{name}");
+                }
+            }
+            ListOutputFormat::Json => {
+                let names = mgr.theme_names_sorted();
+                println!("{}", json!({ "themes": names }));
+            }
+        }
         Ok(true)
     }
 
@@ -172,7 +187,7 @@ impl<'a> TemplatesController<'a> {
     ///
     /// # Errors
     /// Returns an error if the glob pattern is invalid or a matched path cannot be read.
-    pub fn list_templates(&self) -> Result<bool> {
+    fn list_templates(&self, fmt: ListOutputFormat) -> Result<bool> {
         if self.input_dir.exists() {
             let pattern = format!(
                 "{}{}{}",
@@ -191,8 +206,23 @@ impl<'a> TemplatesController<'a> {
                 files.push(name.to_string());
             }
 
+            files.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+
             let root = self.input_dir.to_string_lossy().to_string();
-            utils::print_tree(&files, "template", &root);
+            match fmt {
+                ListOutputFormat::Tree => {
+                    utils::print_tree(&files, "template", &root);
+                }
+                ListOutputFormat::Txt => {
+                    for f in &files {
+                        println!("{}", template_stem(f));
+                    }
+                }
+                ListOutputFormat::Json => {
+                    let templates: Vec<String> = files.iter().map(|f| template_stem(f)).collect();
+                    println!("{}", json!({ "templates": templates }));
+                }
+            }
 
             Ok(true)
         } else {
