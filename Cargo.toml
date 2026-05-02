@@ -42,6 +42,7 @@ print-positions = "0.6.1"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 shellexpand = "3.1"
+strsim = { version = "0.11", optional = true }
 smol = { version = "2.0.2", optional = true }
 strum_macros = "0.27"
 syntect = { version = "5.1.0", optional = true }
@@ -76,6 +77,7 @@ fetcher = ["ctrlc", "crossterm", "indicatif", "isahc", "url", "smol"]
 display = [
     "bincode-build",
     "crossterm",
+    "dep:strsim",
     "syntect-build",
     "sublime-color-scheme",
 ]

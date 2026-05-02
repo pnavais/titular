@@ -1,7 +1,7 @@
+use crate::context::Context;
 use crate::prelude::*;
 use crate::string_utils::expand_to_visual_width;
 use crate::term::TERM_SIZE;
-use crate::context::Context;
 use console::{measure_text_width, strip_ansi_codes};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
@@ -49,7 +49,7 @@ impl TextProcessor {
     ///
     /// # Returns
     /// A new `TextProcessor` with the specified width provider
-    #[must_use] 
+    #[must_use]
     pub fn new(width_provider: Box<dyn Fn() -> usize + Send + Sync>) -> Self {
         Self {
             get_width: Arc::new(Mutex::new(width_provider)),
@@ -68,9 +68,10 @@ impl TextProcessor {
         match normalized {
             "full" => 100,
             "half" => 50,
-            _ => normalized
-                .parse::<i16>()
-                .map_or(100, |n| n.clamp(0, 100) as u8),
+            _ => normalized.parse::<i16>().map_or(100, |n| {
+                let clamped = n.clamp(0, 100);
+                u8::try_from(clamped).unwrap_or(100)
+            }),
         }
     }
 
@@ -86,7 +87,7 @@ impl TextProcessor {
     ///
     /// # Returns
     /// A string with the processed content
-    #[must_use] 
+    #[must_use]
     pub fn process_padding(&self, content: &str) -> String {
         content
             .lines()
@@ -335,11 +336,7 @@ impl TextProcessor {
     /// assert!(result.ends_with("\x1b[0m"));
     /// assert!(result.len() > "\x1b[31m→\x1b[0m".len());
     /// ```
-    fn expand_padding_group(
-        result: &mut String,
-        group: &MatchedGroup,
-        padding_width: usize,
-    ) {
+    fn expand_padding_group(result: &mut String, group: &MatchedGroup, padding_width: usize) {
         // Expand the stripped content
         let stripped_content = strip_ansi_codes(&group.content);
         let expanded_content = expand_to_visual_width(&stripped_content, padding_width);

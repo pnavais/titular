@@ -131,8 +131,7 @@ pub fn command_exists(cmd: &str) -> bool {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
+            .is_ok_and(|status| status.success())
     } else {
         // On Unix-like systems, use 'which' or 'command -v'
         Command::new("which")
@@ -140,8 +139,7 @@ pub fn command_exists(cmd: &str) -> bool {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
+            .is_ok_and(|status| status.success())
     }
 }
 

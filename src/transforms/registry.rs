@@ -15,7 +15,7 @@ impl Default for TransformRegistry {
 }
 
 impl TransformRegistry {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             transforms: HashMap::new(),
@@ -41,7 +41,7 @@ impl TransformRegistry {
         self.order.push(boxed);
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Arc<Box<dyn Transform>>> {
         self.transforms.get(name)
     }
@@ -70,7 +70,7 @@ pub struct TransformManager {
 
 impl TransformManager {
     /// Gets a reference to the global transform manager
-    #[must_use] 
+    #[must_use]
     pub fn get() -> &'static TransformManager {
         static INSTANCE: std::sync::LazyLock<TransformManager> = std::sync::LazyLock::new(|| {
             let mut registry = TransformRegistry::new();
@@ -83,7 +83,7 @@ impl TransformManager {
     }
 
     /// Gets a clone of the shared registry
-    #[must_use] 
+    #[must_use]
     pub fn share(&self) -> Arc<TransformRegistry> {
         Arc::clone(&self.registry)
     }
@@ -103,7 +103,7 @@ impl TransformManager {
     }
 
     /// Gets a transform by name
-    #[must_use] 
+    #[must_use]
     pub fn get_transform(&self, name: &str) -> Option<&Arc<Box<dyn Transform>>> {
         self.registry.get(name)
     }

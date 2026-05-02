@@ -6,13 +6,14 @@ use tera::Tera;
 
 use crate::config::TemplateConfig;
 use crate::constants::template::DEFAULT_TIME_FORMAT;
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use crate::filters::{append, color, hide, pad, style, surround};
 use crate::functions::exit_code;
 use crate::prelude::*;
 use crate::utils::safe_time_format;
 
-static TERA_VAR_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+static TERA_VAR_REGEX: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{\{([^}]+)\}\}").unwrap());
 
 static TERA: std::sync::LazyLock<Mutex<Tera>> = std::sync::LazyLock::new(|| {
     let mut tera = Tera::default();
@@ -43,7 +44,7 @@ impl Default for TemplateRenderer {
 }
 
 impl TemplateRenderer {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }

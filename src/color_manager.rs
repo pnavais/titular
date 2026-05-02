@@ -1,5 +1,9 @@
 use crate::utils::safe_parse;
-use nu_ansi_term::{Color, Color::{Fixed, Black, Red, Green, Yellow, Blue, Purple, Cyan, White}, Style};
+use nu_ansi_term::{
+    Color,
+    Color::{Black, Blue, Cyan, Fixed, Green, Purple, Red, White, Yellow},
+    Style,
+};
 use regex::Regex;
 use std::collections::HashSet;
 
@@ -44,7 +48,7 @@ impl ColorManager {
     /// # Returns
     ///
     /// A string with the color applied
-    #[must_use] 
+    #[must_use]
     pub fn format(colours: &Context, txt: &str, style: StyleFormat) -> String {
         let mut style_obj = Style::new();
 

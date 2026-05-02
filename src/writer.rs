@@ -9,7 +9,7 @@ use nu_ansi_term::Color::Yellow;
 use crate::{
     config::MainConfig,
     constants::template::{DEFAULT_TEMPLATE, DEFAULT_TEMPLATE_EXT},
-    error::{Result, Error},
+    error::{Error, Result},
 };
 
 pub struct TemplateWriter {}
@@ -66,7 +66,7 @@ impl TemplateWriter {
     }
 
     /// Retrieves the template name (without extension)
-    #[must_use] 
+    #[must_use]
     pub fn get_template_name(file_path: &Path) -> String {
         let file_name = file_path.file_name().map_or("@file_name".to_string(), |m| {
             m.to_string_lossy()
@@ -106,9 +106,7 @@ impl TemplateWriter {
                         Yellow.paint(name)
                     );
                     let _ = stdout().flush();
-                    stdin()
-                        .read_line(&mut input)
-                        .map_err(Error::from)?;
+                    stdin().read_line(&mut input).map_err(Error::from)?;
                     input = input.trim().to_lowercase();
                     if input == "y" || input == "yes" || input.is_empty() {
                         break;

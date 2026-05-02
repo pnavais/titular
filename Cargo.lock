@@ -2420,6 +2420,7 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "smol",
+ "strsim",
  "strum_macros",
  "sublime-color-scheme",
  "syntect",

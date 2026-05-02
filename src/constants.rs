@@ -36,8 +36,8 @@ pub mod template {
     /// Default template name
     pub const DEFAULT_TEMPLATE_NAME: &str = "basic";
 
-    /// Default theme for display
-    pub const DEFAULT_THEME: &str = "base16-ocean.dark";
+    /// Default theme for display (must match a key in the embedded theme set)
+    pub const DEFAULT_THEME: &str = "Monokai";
 
     /// Default time format
     pub const DEFAULT_TIME_FORMAT: &str = "%H:%M:%S";

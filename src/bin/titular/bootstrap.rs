@@ -4,18 +4,20 @@ use std::fmt::Write as _;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
+#[cfg(feature = "display")]
+use titular::constants::template::DEFAULT_THEME;
 use titular::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 
+#[cfg(feature = "fetcher")]
+use titular::constants::template::DEFAULT_REMOTE_REPO;
 use titular::{
     config::{parse as config_parse, MainConfig},
     error::{ConfigType, Error, Result},
 };
-#[cfg(feature = "fetcher")]
-use titular::constants::template::DEFAULT_REMOTE_REPO;
 
 use crate::directories::PROJECT_DIRS;
 
-static DEFAULT_CONF: &str = "# File automatically generated on ${date}\n\
+static DEFAULT_CONF_HEAD: &str = "# File automatically generated on ${date}\n\
                             [defaults]\n\
                             fill_char      = \"*\"\n\
                             width          = \"full\"\n\
@@ -23,7 +25,16 @@ static DEFAULT_CONF: &str = "# File automatically generated on ${date}\n\
                             surround_end   = \"]\"\n\
                             time_pattern   = \"{{space}}[{{time}}]\"\n\
                             time_format    = \"${default_time_format}\"\n\
-                            display        = \"${default_pager}\"\n\n\
+                            display        = \"${default_pager}\"\n";
+
+#[cfg(feature = "display")]
+static DEFAULT_CONF_DISPLAY_THEME: &str =
+    "                            display_theme  = \"${default_display_theme}\"\n";
+
+#[cfg(not(feature = "display"))]
+static DEFAULT_CONF_DISPLAY_THEME: &str = "";
+
+static DEFAULT_CONF_TAIL: &str = "\n\
                             [vars]\n\
                             steel_blue   = \"RGB(70, 130, 180)\"\n\
                             light_purple = \"FIXED(134)\"\n\
@@ -133,19 +144,26 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
     std::fs::create_dir_all(parent_dir)?;
     let templates_dir = parent_dir.join("templates").to_string_lossy().into_owned();
     let current_date: DateTime<Local> = Local::now();
-    let config_data = DEFAULT_CONF
-        .replacen("${templates_dir}", &templates_dir, 1)
-        .replacen("${date}", &current_date.to_string(), 1)
-        .replacen("${default_template_name}", DEFAULT_TEMPLATE_NAME, 1)
-        .replacen("${default_time_format}", DEFAULT_TIME_FORMAT, 1)
-        .replacen(
-            "${default_pager}",
-            #[cfg(feature = "display")]
-            "fancy",
-            #[cfg(not(feature = "display"))]
-            "bat_or_pager",
-            1,
-        );
+    let config_data = [
+        DEFAULT_CONF_HEAD,
+        DEFAULT_CONF_DISPLAY_THEME,
+        DEFAULT_CONF_TAIL,
+    ]
+    .concat()
+    .replacen("${templates_dir}", &templates_dir, 1)
+    .replacen("${date}", &current_date.to_string(), 1)
+    .replacen("${default_template_name}", DEFAULT_TEMPLATE_NAME, 1)
+    .replacen("${default_time_format}", DEFAULT_TIME_FORMAT, 1)
+    .replacen(
+        "${default_pager}",
+        #[cfg(feature = "display")]
+        "fancy",
+        #[cfg(not(feature = "display"))]
+        "bat_or_pager",
+        1,
+    );
+    #[cfg(feature = "display")]
+    let config_data = config_data.replacen("${default_display_theme}", DEFAULT_THEME, 1);
 
     let config_data = {
         #[cfg(feature = "fetcher")]

@@ -119,7 +119,7 @@ impl Default for Templates {
 }
 
 impl MainConfig {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let mut main_config = MainConfig {
             ..Default::default()
@@ -132,8 +132,7 @@ impl MainConfig {
     pub fn init(&mut self) {
         // Keep defaults as vars
         self.defaults.to_map().iter().for_each(|(k, v)| {
-            self.vars
-                .insert(format!("defaults.{k}"), v.clone());
+            self.vars.insert(format!("defaults.{k}"), v.clone());
         });
         // Add misc vars
         self.vars.insert(
@@ -177,8 +176,8 @@ impl Defaults {
     #[must_use]
     pub fn to_map(&self) -> BTreeMap<String, String> {
         // Convert the struct to a JSON value
-        let json_value = serde_json::to_value(self)
-            .expect("Defaults should always serialize to JSON");
+        let json_value =
+            serde_json::to_value(self).expect("Defaults should always serialize to JSON");
 
         // Convert JSON object to HashMap
         let mut map = BTreeMap::new();

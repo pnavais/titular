@@ -12,7 +12,7 @@ impl Default for LineHandler {
 }
 
 impl LineHandler {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -34,7 +34,11 @@ impl Transform for LineHandler {
         Ok(format!(
             "{}{}",
             text,
-            if ctx.is_active("skip-newline") { "" } else { "\n" }
+            if ctx.is_active("skip-newline") {
+                ""
+            } else {
+                "\n"
+            }
         ))
     }
 }

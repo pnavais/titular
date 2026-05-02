@@ -1,7 +1,7 @@
 use crate::{
     config::{parse as config_parse, TemplateConfig},
     constants::template::DEFAULT_TEMPLATE_EXT,
-    error::{Result, Error, ConfigType},
+    error::{ConfigType, Error, Result},
     log,
 };
 

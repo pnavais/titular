@@ -26,6 +26,8 @@ use syntect::{
 use crate::term::TERM_SIZE;
 #[cfg(feature = "display")]
 use crate::theme::ThemeManager;
+#[cfg(feature = "display")]
+use nu_ansi_term::Color::Yellow;
 
 use crate::utils::command_exists;
 
@@ -124,11 +126,27 @@ fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
         .or_else(|| ctx.get("defaults.display_theme"))
         .map_or(DEFAULT_THEME, |s| s as &str);
 
-    let theme = theme_manager
-        .theme_set
-        .themes
-        .get(theme_name)
-        .unwrap_or(theme_manager.get_theme(DEFAULT_THEME));
+    let theme = match theme_manager.resolve_theme(theme_name) {
+        Some(theme) => theme,
+        None => {
+            let fallback = theme_manager
+                .resolve_theme(DEFAULT_THEME)
+                .expect("DEFAULT_THEME must be present in embedded theme set");
+            if theme_name != DEFAULT_THEME {
+                let msg = format!(
+                    "WARN: syntax highlighting theme '{}' was not found; using default '{}'.",
+                    theme_name, DEFAULT_THEME
+                );
+                let _ = writeln!(io::stderr(), "{}", Yellow.paint(msg));
+                let hints = theme_manager.suggest_theme_names(theme_name, 3);
+                if !hints.is_empty() {
+                    let hint_msg = format!("      Did you mean: {}?", hints.join(", "));
+                    let _ = writeln!(io::stderr(), "{}", Yellow.paint(hint_msg));
+                }
+            }
+            fallback
+        }
+    };
 
     // Find the TOML syntax
     let syntax = syntax_set

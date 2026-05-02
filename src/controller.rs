@@ -1,8 +1,13 @@
 use std::path::PathBuf;
 
 use crate::{
-    config::MainConfig, constants::template::DEFAULT_TEMPLATE_EXT, context::Context, display,
-    error::{Error, Result}, formatter::TemplateFormatter, writer::TemplateWriter,
+    config::MainConfig,
+    constants::template::DEFAULT_TEMPLATE_EXT,
+    context::Context,
+    display,
+    error::{Error, Result},
+    formatter::TemplateFormatter,
+    writer::TemplateWriter,
 };
 
 use crate::utils;
@@ -24,7 +29,7 @@ pub struct TemplatesController<'a> {
 /// Provides all the operations involving templates management (list, open, create, edit, add (when "fetcher" feature enabled))
 /// and formatting/rendering.
 impl<'a> TemplatesController<'a> {
-    #[must_use] 
+    #[must_use]
     pub fn new(input_dir: PathBuf, config: &'a MainConfig) -> Self {
         Self { input_dir, config }
     }
@@ -176,14 +181,13 @@ impl<'a> TemplatesController<'a> {
                 DEFAULT_TEMPLATE_EXT
             );
             let mut files = Vec::new();
-            for entry in glob(&pattern)
-                .map_err(|e| Error::Msg(format!("Invalid glob pattern: {e}")))?
+            for entry in
+                glob(&pattern).map_err(|e| Error::Msg(format!("Invalid glob pattern: {e}")))?
             {
                 let path = entry.map_err(|e| Error::Msg(format!("Glob iteration error: {e}")))?;
-                let name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .ok_or_else(|| Error::Msg("Non-UTF-8 or missing file name in template path".to_string()))?;
+                let name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+                    Error::Msg("Non-UTF-8 or missing file name in template path".to_string())
+                })?;
                 files.push(name.to_string());
             }
 
@@ -279,10 +283,7 @@ impl<'a> TemplatesController<'a> {
                 }
             }
         } else {
-            println!(
-                "{}",
-                Yellow.paint(format!("Template \"{name}\" not found"))
-            );
+            println!("{}", Yellow.paint(format!("Template \"{name}\" not found")));
         }
 
         Ok(true)
@@ -315,10 +316,7 @@ impl<'a> TemplatesController<'a> {
                 }),
             };
         }
-        println!(
-            "{}",
-            Yellow.paint(format!("Template \"{name}\" not found"))
-        );
+        println!("{}", Yellow.paint(format!("Template \"{name}\" not found")));
         Ok(true)
     }
 

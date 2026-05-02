@@ -1,11 +1,10 @@
 use std::env;
 
-
 pub static DEBUG_ENABLED: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| {
     env::var("TITULAR_DEBUG").is_ok_and(|log_level| log_level.eq("true") || log_level.eq("1"))
 });
 
-#[must_use] 
+#[must_use]
 pub fn is_debug_enabled() -> bool {
     *DEBUG_ENABLED
 }

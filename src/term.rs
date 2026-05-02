@@ -1,4 +1,3 @@
-
 #[derive(Default)]
 pub struct TermSize {
     width: usize,
@@ -10,7 +9,7 @@ pub struct TermSize {
 /// # Returns
 /// A `TermSize` struct with the stored terminal width and height
 impl TermSize {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> TermSize {
         if let Some((w, h)) = Self::get_dimensions() {
             TermSize {
@@ -53,7 +52,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The stored terminal width
-    #[must_use] 
+    #[must_use]
     pub fn get_term_width(&self) -> usize {
         self.width
     }
@@ -62,7 +61,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The stored terminal height
-    #[must_use] 
+    #[must_use]
     pub fn get_term_height(&self) -> usize {
         self.height
     }
@@ -71,7 +70,7 @@ impl TermSize {
     ///
     /// # Returns
     /// The current terminal width
-    #[must_use] 
+    #[must_use]
     pub fn get_current_width() -> usize {
         if let Some((w, _h)) = Self::get_dimensions() {
             w

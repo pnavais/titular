@@ -63,13 +63,9 @@ impl Dispatcher for GitHubDispatcher {
 
         // Construct the GitHub API content URL
         let api_url = if let Some(branch) = branch {
-            format!(
-                "https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={branch}"
-            )
+            format!("https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={branch}")
         } else {
-            format!(
-                "https://api.github.com/repos/{owner}/{repo}/contents/{path}"
-            )
+            format!("https://api.github.com/repos/{owner}/{repo}/contents/{path}")
         };
 
         GitHubDispatcher::fetch_templates(&api_url)

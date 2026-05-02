@@ -24,7 +24,10 @@ pub fn create_color_filter() -> impl Fn(&Value, &HashMap<String, Value>) -> Resu
             .to_string();
 
         // Default to false if is_bg is not provided or not a boolean
-        let is_bg = args.get("is_bg").and_then(serde_json::Value::as_bool).unwrap_or(false);
+        let is_bg = args
+            .get("is_bg")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
 
         let style = StyleFormat {
             fg_color: (!is_bg).then_some(color_value.clone()),

@@ -1,6 +1,10 @@
 pub struct TemplateFetcher;
 
-use std::{fmt::Write, io::Write as _, path::{Path, PathBuf}};
+use std::{
+    fmt::Write,
+    io::Write as _,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     constants::template::DEFAULT_TEMPLATE_EXT,
@@ -19,7 +23,7 @@ use nu_ansi_term::Color::{Green, Yellow};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use std::time::Duration;
 
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use crossterm::cursor::{Hide, Show};
 
 pub struct TargetInfo {
@@ -52,9 +56,7 @@ impl TemplateFetcher {
                 if result {
                     println!(
                         "{}",
-                        Green.paint(format!(
-                            "Template '{template_name}' installed successfully"
-                        ))
+                        Green.paint(format!("Template '{template_name}' installed successfully"))
                     );
                 }
             } else {
@@ -359,7 +361,9 @@ impl TemplateFetcher {
                     .and_then(|v| v.to_str().ok())
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
-                let final_url = r.effective_uri().map_or(url.to_string(), std::string::ToString::to_string);
+                let final_url = r
+                    .effective_uri()
+                    .map_or(url.to_string(), std::string::ToString::to_string);
                 (total_size, final_url)
             }
             Err(_) => (0, url.to_string()),

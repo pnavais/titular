@@ -9,7 +9,7 @@ pub struct ContextManager {
 
 impl ContextManager {
     /// Gets a reference to the global context manager
-    #[must_use] 
+    #[must_use]
     pub fn get() -> &'static ContextManager {
         static INSTANCE: std::sync::LazyLock<ContextManager> =
             std::sync::LazyLock::new(|| ContextManager {
@@ -19,7 +19,7 @@ impl ContextManager {
     }
 
     /// Gets a clone of the shared context
-    #[must_use] 
+    #[must_use]
     pub fn share(&self) -> Arc<RwLock<Context>> {
         Arc::clone(&self.context)
     }

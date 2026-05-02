@@ -36,7 +36,7 @@ pub enum AnsiTruncateBehavior {
 /// assert!(!is_visually_empty("Hello")); // Has visible text
 /// assert!(!is_visually_empty("\x1b[31mHello\x1b[0m")); // Has visible text with ANSI codes
 /// ```
-#[must_use] 
+#[must_use]
 pub fn is_visually_empty(s: &str) -> bool {
     // First strip ANSI codes
     let stripped = strip_ansi_codes(s);
@@ -136,7 +136,7 @@ pub fn print_raw_ansi(title: &str, text: &str) {
 /// assert_eq!(expand_to_width("🦀", 2), "🦀🦀");
 /// assert_eq!(expand_to_width("🦀🌟", 3), "🦀🌟🦀");
 /// ```
-#[must_use] 
+#[must_use]
 pub fn expand_to_width(input: &str, target_width: usize) -> String {
     // Collect the "print positions" (user-visible glyphs, including ANSI)
     let positions: Vec<&str> = print_positions(input)
@@ -194,7 +194,7 @@ pub fn expand_to_width(input: &str, target_width: usize) -> String {
 /// assert_eq!(expand_to_visual_width("📦", 4), "📦📦"); // Each emoji is 2 units wide
 /// assert_eq!(expand_to_visual_width("📦🌟", 6), "📦🌟📦"); // Each emoji is 2 units wide
 /// ```
-#[must_use] 
+#[must_use]
 pub fn expand_to_visual_width(input: &str, target_width: usize) -> String {
     // If input is empty, return as is
     if input.is_empty() {

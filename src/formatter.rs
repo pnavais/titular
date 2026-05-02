@@ -14,7 +14,7 @@ pub struct TemplateFormatter<'a> {
 }
 
 impl<'a> TemplateFormatter<'a> {
-    #[must_use] 
+    #[must_use]
     pub fn new(input_dir: &'a std::path::PathBuf, config: &'a MainConfig) -> Self {
         Self { input_dir, config }
     }

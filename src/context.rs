@@ -32,7 +32,7 @@ pub struct Context {
 
 /// Provides the methods to access the values present in the context struct
 impl Context {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Context {
             template: TemplateContext::default(),
@@ -62,7 +62,7 @@ impl Context {
     ///
     /// # Returns
     /// An option containing a reference to the component if found
-    #[must_use] 
+    #[must_use]
     pub fn get_object<T: 'static + Send + Sync>(&self, key: &str) -> Option<&T> {
         self.registry
             .items
@@ -136,7 +136,7 @@ impl Context {
     }
 
     /// Returns a reference to the underlying tera context
-    #[must_use] 
+    #[must_use]
     pub fn get_data(&self) -> &TeraContext {
         &self.template.data
     }
@@ -253,7 +253,9 @@ impl Context {
         let value = match serde_json::to_value(val) {
             Ok(Value::String(s)) => {
                 // Try to resolve variable references
-                if let Ok(resolved) = self.resolve_variable(&s, &mut HashSet::new()) { Value::String(resolved) } else {
+                if let Ok(resolved) = self.resolve_variable(&s, &mut HashSet::new()) {
+                    Value::String(resolved)
+                } else {
                     let value = Value::String(if s.starts_with('$') {
                         String::new()
                     } else {
@@ -285,7 +287,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns an option containing a reference to the value associated with the given key.
-    #[must_use] 
+    #[must_use]
     pub fn get_raw(&self, key: &str) -> Option<&Value> {
         self.template.data.get(key)
     }
@@ -299,7 +301,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns an option containing a reference to the value associated with the given key.
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.get_raw(key).and_then(|v| match v {
             Value::Array(arr) if !arr.is_empty() => arr[0].as_str(),
@@ -314,7 +316,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns a vector of strings containing all values associated with the given key.
-    #[must_use] 
+    #[must_use]
     pub fn get_all(&self, key: &str) -> Option<Vec<&str>> {
         self.get_raw(key).and_then(|v| match v {
             Value::Array(arr) => {
@@ -336,7 +338,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns `true` if the key exists and its value is "true" or "1", `false` otherwise.
-    #[must_use] 
+    #[must_use]
     pub fn get_flag(&self, key: &str) -> Option<bool> {
         match self.template.data.get(key) {
             Some(v) => Some(matches!(
@@ -355,7 +357,7 @@ impl Context {
     ///
     /// # Returns
     /// Returns `true` if the key exists and its value is "true" or "1", `false` otherwise.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self, key: &str) -> bool {
         match self.get(key) {
             Some(v) => matches!(v.trim().to_lowercase().as_str(), "true" | "1"),
@@ -391,18 +393,13 @@ impl Context {
     /// * `key` - The key to insert the values into.
     /// * `values` - The values to insert into the context.
     pub fn insert_multi(&mut self, key: &str, values: Vec<&str>) {
-        let mut count = 1;
-        for v in values {
+        for (count, v) in (1..).zip(values) {
             let k = if count > 1 {
-                let mut k = String::new();
-                k.push_str(key);
-                k.push_str(&count.to_string());
-                k
+                format!("{key}{count}")
             } else {
                 key.to_string()
             };
             self.insert(k, &v);
-            count += 1;
         }
     }
 
