@@ -7,7 +7,7 @@ url     = "https://github.com/pnavais"
 [vars]
 fail_color = "red"
 debug_message_color = "yellow"
-fallback_main = "green"
+fallback_main = ""
 f="."
 c="${theme_foreground:fallback_main}"
 c2="$debug_message_color"

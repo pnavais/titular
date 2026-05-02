@@ -13,8 +13,6 @@ use crate::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 
 #[cfg(feature = "fetcher")]
 use crate::constants::template::DEFAULT_REMOTE_REPO;
-#[cfg(feature = "display")]
-use crate::constants::template::DEFAULT_THEME;
 use crate::error::{Error, Result};
 use crate::utils::safe_time_format;
 
@@ -51,6 +49,7 @@ pub struct Defaults {
     pub time_pattern: String,
     pub display: Option<Display>,
     #[cfg(feature = "display")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_theme: Option<String>,
 }
 
@@ -61,6 +60,9 @@ pub struct Templates {
     pub default: String,
     #[cfg(feature = "fetcher")]
     pub remote_repo: Option<String>,
+    #[cfg(feature = "display")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -102,7 +104,7 @@ impl Default for Defaults {
             time_pattern: "${space}%{time:fg[tc]}".to_string(),
             display: Some(Display::Raw),
             #[cfg(feature = "display")]
-            display_theme: Some(DEFAULT_THEME.to_string()),
+            display_theme: None,
         }
     }
 }
@@ -114,6 +116,8 @@ impl Default for Templates {
             default: DEFAULT_TEMPLATE_NAME.to_string(),
             #[cfg(feature = "fetcher")]
             remote_repo: Some(DEFAULT_REMOTE_REPO.to_string()),
+            #[cfg(feature = "display")]
+            theme: None,
         }
     }
 }
@@ -139,6 +143,13 @@ impl MainConfig {
             "time".to_owned(),
             safe_time_format(&Local::now(), &self.defaults.time_format),
         );
+
+        #[cfg(feature = "display")]
+        if let Some(ref t) = self.templates.theme {
+            if crate::theme::theme_token_is_set(t) {
+                self.vars.insert("templates.theme".to_string(), t.clone());
+            }
+        }
     }
 }
 
@@ -185,8 +196,8 @@ impl Defaults {
             for (key, value) in obj {
                 if let serde_json::Value::String(s) = value {
                     map.insert(key, s);
-                } else if let serde_json::Value::Null = value {
-                    map.insert(key, "null".to_string());
+                } else if serde_json::Value::Null == value {
+                    continue;
                 } else {
                     map.insert(key, value.to_string());
                 }

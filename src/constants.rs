@@ -18,8 +18,8 @@ pub mod template {
                                 author  = \"@author\"\n\
                                 url     = \"@url\"\n\n\
                                 [vars]\n\
-                                fallback_accent = \"green\"\n\
-                                fallback_msg = \"green\"\n\
+                                fallback_accent = \"\"\n\
+                                fallback_msg = \"\"\n\
                                 main_color = \"${theme_keyword:fallback_accent}\"\n\
                                 message_color = \"${theme_foreground:fallback_msg}\"\n\
                                 white=\"RGB(255,255,255)\"\n\

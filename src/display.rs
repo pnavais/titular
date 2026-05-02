@@ -25,7 +25,7 @@ use syntect::{
 #[cfg(feature = "display")]
 use crate::term::TERM_SIZE;
 #[cfg(feature = "display")]
-use crate::theme::ThemeManager;
+use crate::theme::{theme_name_for_display_preview, ThemeManager};
 
 use crate::utils::command_exists;
 
@@ -115,14 +115,10 @@ fn display_fancy(content: &str, ctx: &Context) -> Result<()> {
     // Load the serialized theme set from the build script
     let theme_manager = ThemeManager::init()?;
 
-    // Theme selection chain:
-    // 1. Try to get theme from context
-    // 2. Fallback to defaults.display_theme
-    // 3. Finally use DEFAULT_THEME
-    let theme_name = ctx
-        .get("theme")
-        .or_else(|| ctx.get("defaults.display_theme"))
-        .map_or(DEFAULT_THEME, |s| s as &str);
+    let Some(theme_name) = theme_name_for_display_preview(ctx) else {
+        print!("{content}");
+        return Ok(());
+    };
 
     let theme = match theme_manager.resolve_theme(theme_name) {
         Some(theme) => theme,

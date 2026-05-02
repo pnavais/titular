@@ -5,9 +5,9 @@ author  = "pnavais"
 url     = "https://github.com/pnavais"
 
 [vars]
-# Theme palette (`-T` / `defaults.display_theme`) when built with `display`; fallbacks keep plain builds usable.
-fallback_accent = "green"
-fallback_msg = "green"
+# Uncolored when no theme is set (`-T` / `[templates].theme` empty); `theme_*` fills when set (`display` feature).
+fallback_accent = ""
+fallback_msg = ""
 main_color = "${theme_keyword:fallback_accent}"
 message_color = "${theme_foreground:fallback_msg}"
 white="RGB(255,255,255)"

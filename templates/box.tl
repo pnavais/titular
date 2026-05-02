@@ -5,9 +5,9 @@ author  = "pnavais"
 url     = "https://github.com/pnavais"
 
 [vars]
-fallback_accent = "green"
-fallback_border = "green"
-fallback_msg = "green"
+fallback_accent = ""
+fallback_border = ""
+fallback_msg = ""
 accent_color = "${theme_keyword:fallback_accent}"
 border_color = "${theme_comment:fallback_border}"
 message_color = "${theme_foreground:fallback_msg}"

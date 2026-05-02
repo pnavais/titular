@@ -5,7 +5,9 @@ use crate::{
 };
 #[cfg(feature = "display")]
 use crate::{
-    constants::template::DEFAULT_THEME, theme::ThemeManager, theme_palette::palette_from_theme,
+    constants::template::DEFAULT_THEME,
+    theme::{theme_name_for_template_palette, ThemeManager},
+    theme_palette::palette_from_theme,
 };
 use std::io::{stdout, Write};
 
@@ -29,10 +31,9 @@ impl<'a> TemplateFormatter<'a> {
         let Ok(tm) = ThemeManager::init() else {
             return;
         };
-        let theme_name = ctx
-            .get("theme")
-            .or_else(|| ctx.get("defaults.display_theme"))
-            .unwrap_or(DEFAULT_THEME);
+        let Some(theme_name) = theme_name_for_template_palette(ctx) else {
+            return;
+        };
 
         let th = match tm.resolve_theme(theme_name) {
             Some(th) => th,

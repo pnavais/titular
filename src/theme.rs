@@ -1,6 +1,7 @@
 use strsim::jaro_winkler;
 use syntect::highlighting::{Theme, ThemeSet};
 
+use crate::context::Context;
 use crate::{error::Result, utils};
 use nu_ansi_term::Color::{Green, Yellow};
 use std::io::{self, Write};
@@ -54,6 +55,28 @@ pub(crate) fn rank_theme_name_suggestions<'a>(
         .take(limit)
         .map(|(_, k)| k)
         .collect()
+}
+
+/// Whether `s` counts as an explicit theme name from CLI/config (filters blanks and legacy `"null"`).
+#[must_use]
+pub fn theme_token_is_set(s: &str) -> bool {
+    !s.trim().is_empty() && s != "null"
+}
+
+/// Theme for **rendered titles** (`theme_*` palette): CLI `-T` (`theme`), then `[templates].theme`.
+#[must_use]
+pub fn theme_name_for_template_palette(ctx: &Context) -> Option<&str> {
+    ctx.get("theme")
+        .filter(|s| theme_token_is_set(s))
+        .or_else(|| ctx.get("templates.theme").filter(|s| theme_token_is_set(s)))
+}
+
+/// Theme for **fancy / preview highlighting**: CLI `-T` (`theme`), then `[defaults].display_theme`.
+#[must_use]
+pub fn theme_name_for_display_preview(ctx: &Context) -> Option<&str> {
+    ctx.get("theme")
+        .filter(|s| theme_token_is_set(s))
+        .or_else(|| ctx.get("defaults.display_theme").filter(|s| theme_token_is_set(s)))
 }
 
 pub struct ThemeManager {
@@ -175,7 +198,41 @@ impl ThemeManager {
 
 #[cfg(all(test, feature = "display"))]
 mod tests {
-    use super::{rank_theme_name_suggestions, ThemeManager};
+    use super::{
+        rank_theme_name_suggestions, theme_name_for_display_preview,
+        theme_name_for_template_palette, ThemeManager,
+    };
+    use crate::context::Context;
+
+    #[test]
+    fn cli_theme_wins_for_both_resolution_helpers() {
+        let mut ctx = Context::new();
+        ctx.insert("templates.theme", "Dracula");
+        ctx.insert("defaults.display_theme", "Catppuccin Mocha");
+        ctx.insert("theme", "Monokai");
+        assert_eq!(theme_name_for_template_palette(&ctx), Some("Monokai"));
+        assert_eq!(theme_name_for_display_preview(&ctx), Some("Monokai"));
+    }
+
+    #[test]
+    fn template_palette_uses_templates_theme_not_display_defaults() {
+        let mut ctx = Context::new();
+        ctx.insert("defaults.display_theme", "Dracula");
+        assert_eq!(theme_name_for_template_palette(&ctx), None);
+
+        ctx.insert("templates.theme", "Monokai");
+        assert_eq!(theme_name_for_template_palette(&ctx), Some("Monokai"));
+    }
+
+    #[test]
+    fn display_preview_uses_defaults_display_theme_not_templates_theme() {
+        let mut ctx = Context::new();
+        ctx.insert("templates.theme", "Monokai");
+        assert_eq!(theme_name_for_display_preview(&ctx), None);
+
+        ctx.insert("defaults.display_theme", "Dracula");
+        assert_eq!(theme_name_for_display_preview(&ctx), Some("Dracula"));
+    }
 
     #[test]
     fn resolve_theme_matches_case_insensitively() {

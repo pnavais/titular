@@ -4,8 +4,6 @@ use std::fmt::Write as _;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, fs::File};
-#[cfg(feature = "display")]
-use titular::constants::template::DEFAULT_THEME;
 use titular::constants::template::{DEFAULT_TEMPLATE_NAME, DEFAULT_TIME_FORMAT};
 
 #[cfg(feature = "fetcher")]
@@ -28,12 +26,29 @@ static DEFAULT_CONF_HEAD: &str = "# File automatically generated on ${date}\n\
                             display        = \"${default_pager}\"\n";
 
 #[cfg(feature = "display")]
-static DEFAULT_CONF_DISPLAY_THEME: &str =
-    "                            display_theme  = \"${default_display_theme}\"\n";
+static DEFAULT_CONF_DISPLAY_THEME: &str = "                            # Optional: syntect theme for fancy preview / template browsing (`titular templates …`).\n\
+                             # display_theme = \"Monokai\"\n";
 
 #[cfg(not(feature = "display"))]
 static DEFAULT_CONF_DISPLAY_THEME: &str = "";
 
+#[cfg(feature = "display")]
+static DEFAULT_CONF_TAIL: &str = "\n\
+                            [vars]\n\
+                            steel_blue   = \"RGB(70, 130, 180)\"\n\
+                            light_purple = \"FIXED(134)\"\n\
+                            red          = \"NAME(Red)\"\n\
+                            green        = \"NAME(Green)\"\n\
+                            yellow       = \"NAME(Yellow)\"\n\
+                            blue         = \"NAME(Blue)\"\n\
+                            orange       = \"RGB(255,165,0)\"\n\
+                            space        = \" \"\n\n\
+                            [templates]\n\
+                            directory    = \"${templates_dir}\"\n\
+                            default      = \"${default_template_name}\"\n\
+                            # theme        = \"Monokai\"  # optional: default syntect theme for rendered titles (`theme_*` palette)\n";
+
+#[cfg(not(feature = "display"))]
 static DEFAULT_CONF_TAIL: &str = "\n\
                             [vars]\n\
                             steel_blue   = \"RGB(70, 130, 180)\"\n\
@@ -162,8 +177,6 @@ fn create_default_config(config_file: &PathBuf) -> Result<String> {
         "bat_or_pager",
         1,
     );
-    #[cfg(feature = "display")]
-    let config_data = config_data.replacen("${default_display_theme}", DEFAULT_THEME, 1);
 
     let config_data = {
         #[cfg(feature = "fetcher")]
