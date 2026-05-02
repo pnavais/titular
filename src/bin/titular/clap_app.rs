@@ -129,8 +129,14 @@ fn configure_subcommands() -> Command {
     let templates_subcmd = Command::new("templates")
     .about("Modify the templates configuration")
     .arg_required_else_help(true)
-    .subcommand(build_list_command())
-    .subcommand(
+    .subcommand(build_list_command());
+
+    #[cfg(feature = "bundler")]
+    let templates_subcmd = templates_subcmd
+        .subcommand(build_export_command())
+        .subcommand(build_import_command());
+
+    let templates_subcmd = templates_subcmd.subcommand(
         Command::new("create")
         .alias("new")
         .arg(arg!(<template> "The name of template to create"))
@@ -222,6 +228,48 @@ fn build_list_command() -> Command {
     );
 
     cmd
+}
+
+#[cfg(feature = "bundler")]
+fn build_export_command() -> Command {
+    Command::new("export")
+        .about("Export installed templates as a .tpz archive (ZIP format).")
+        .long_about(
+            "Packs all *.tl templates under the configured templates directory into a single \
+             .tpz file (standard ZIP). Without -o/--output, writes titular_templates_<host>_<timestamp>.tpz \
+             in the current working directory.",
+        )
+        .arg(
+            Arg::new("output")
+                .short('o')
+                .long("output")
+                .value_name("PATH")
+                .help("Output .tpz path (default: titular_templates_<host>_<timestamp>.tpz in cwd)"),
+        )
+}
+
+#[cfg(feature = "bundler")]
+fn build_import_command() -> Command {
+    Command::new("import")
+        .about("Import templates from a .tpz archive (ZIP format).")
+        .long_about(
+            "Extracts *.tl files from a .tpz bundle into the configured templates directory. \
+             Existing files are skipped unless -f/--force is set (a yellow WARN is printed for each skip).",
+        )
+        .arg(
+            Arg::new("bundle")
+                .required(true)
+                .index(1)
+                .value_name("FILE")
+                .help("Path to the .tpz file"),
+        )
+        .arg(
+            Arg::new("force")
+                .short('f')
+                .long("force")
+                .action(ArgAction::SetTrue)
+                .help("Overwrite existing template files"),
+        )
 }
 
 /// Builds the show command with optional themes argument when display feature is enabled

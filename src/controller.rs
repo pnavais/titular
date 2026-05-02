@@ -1,5 +1,9 @@
+#[cfg(feature = "bundler")]
+use std::path::Path;
 use std::path::PathBuf;
 
+#[cfg(feature = "bundler")]
+use crate::template_bundle;
 use crate::{
     config::MainConfig,
     constants::template::DEFAULT_TEMPLATE_EXT,
@@ -61,6 +65,7 @@ impl<'a> TemplatesController<'a> {
 
     /// Runs any of the templates subcommands. Currently supported :
     /// - list : shows the files stored in the templates repository
+    /// - export / import : `.tpz` template bundles (`bundler` feature)
     /// - edit : opens or creates if not existing the given template in the default system editor (see "edit" crate for more information)
     /// - create : creates a new template from sratch with a default template pattern
     /// - remove : deletes the given template from the templates repository
@@ -79,6 +84,27 @@ impl<'a> TemplatesController<'a> {
         match context.get("subcommand") {
             Some(cmd) => match cmd {
                 "list" => self.list(context),
+                #[cfg(feature = "bundler")]
+                "export" => {
+                    let out = match context.get("output") {
+                        Some(p) => PathBuf::from(p),
+                        None => template_bundle::default_export_path()?,
+                    };
+                    template_bundle::export_templates_dir(&self.input_dir, &out)?;
+                    Ok(true)
+                }
+                #[cfg(feature = "bundler")]
+                "import" => {
+                    let bundle = context.get("bundle").ok_or_else(|| {
+                        Error::CommandError("Missing .tpz bundle path".to_string())
+                    })?;
+                    template_bundle::import_bundle_to_templates_dir(
+                        Path::new(bundle),
+                        &self.input_dir,
+                        context.is_active("force"),
+                    )?;
+                    Ok(true)
+                }
                 "create" | "edit" | "remove" | "show" => {
                     let template_name = context
                         .get("template")
@@ -206,7 +232,7 @@ impl<'a> TemplatesController<'a> {
                 files.push(name.to_string());
             }
 
-            files.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+            files.sort_by_key(|a| a.to_ascii_lowercase());
 
             let root = self.input_dir.to_string_lossy().to_string();
             match fmt {

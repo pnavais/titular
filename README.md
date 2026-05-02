@@ -60,7 +60,8 @@ Titular comes with different feature sets that can be enabled during installatio
 
 - `minimal`: Basic functionality with terminal size detection
 - `application`: Default feature set including minimal and fetcher
-- `full_application`: All features including display capabilities
+- `full_application`: Display capabilities plus template `.tpz` bundles (`bundler`)
+- `bundler`: `titular templates export` / `import` for `.tpz` archives (ZIP format)
 - `display`: Syntax highlighting and theme support
 - `display-themes`: Extended theme support
 
