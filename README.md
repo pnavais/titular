@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Titular logo](https://raw.githubusercontent.com/pnavais/titular/main/logo.png?t=20260502)
+![Titular logo](https://raw.githubusercontent.com/pnavais/titular/main/logo.png?v2&t=20260503)
 
 </div>
 
