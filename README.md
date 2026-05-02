@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Titular logo](./logo.png)
+![Titular logo](./logo.png?t=20260502)
 
 </div>
 
@@ -36,7 +36,7 @@ cargo install --path .
 cargo install titular
 ```
 
-Default crates.io builds use the **`application`** feature set (`minimal` + **`fetcher`**). For themes, fancy preview, and `.tpz` bundles, install with **`full_application`** (see [Cargo features](#cargo-features)).
+Default crates.io builds use the **`application`** feature set (`minimal` + **`fetcher`**). For themes, fancy preview, and `.tpz` bundles, install with **`full_application`** (see [Cargo features][...]
 
 ## Usage
 
@@ -94,17 +94,17 @@ titular templates import ./bundle.tpz -f              # overwrite existing
 
 ## Templates (Tera)
 
-The visible title line comes from a **template file** (`.tl`): TOML sections describe metadata and variables; the actual layout is a **[Tera](https://keats.github.io/tera/)** string in `[pattern].data`. Titular registers **custom filters and one function** on top of Tera’s usual syntax (`{{ }}`, `{% if %}`, filters, and [built-ins](https://keats.github.io/tera/docs/#built-ins) supplied by the engine).
+The visible title line comes from a **template file** (`.tl`): TOML sections describe metadata and variables; the actual layout is a **[Tera](https://keats.github.io/tera/)** string in `[pattern].[...]
 
 ### Layout of a `.tl` file
 
 | Section | Role |
 | ------- | ---- |
 | **`[details]`** | `name`, `version`, `author`, `url`, … |
-| **`[vars]`** | Names you use inside the pattern (`f`, `c`, …). With **`display`**, values can reference **`theme_*`** placeholders (e.g. `${theme_keyword:fallback_accent}`) resolved against the active Syntect theme. |
+| **`[vars]`** | Names you use inside the pattern (`f`, `c`, …). With **`display`**, values can reference **`theme_*`** placeholders (e.g. `${theme_keyword:fallback_accent}`) resolved against t[...]
 | **`[pattern]`** | **`data`** — the Tera template string rendered with the live **context** |
 
-At run time the context includes things you pass on the CLI (e.g. **`m`**, **`m2`**, … from repeated **`-m`**; **`f`** / **`f2`** from **`-f`**; **`c`** from **`-c`**), **`--set` `key=value`** pairs, defaults from **`titular.toml`**, and flags like **`hide`** when **`--hide`** is set.
+At run time the context includes things you pass on the CLI (e.g. **`m`**, **`m2`**, … from repeated **`-m`**; **`f`** / **`f2`** from **`-f`**; **`c`** from **`-c`**), **`--set` `key=value`** [...]
 
 ### Custom Tera filters
 
@@ -112,13 +112,13 @@ All of these are registered in every build **except** **`markup`**, which requir
 
 | Filter | Arguments | What it does |
 | ------ | --------- | ------------ |
-| **`color`** | **`name`** (required): color key / literal · optional **`is_bg`** (`true` / `false`) | Wraps text in ANSI foreground (default) or background color via titular’s palette resolver. |
+| **`color`** | **`name`** (required): color key / literal · optional **`is_bg`** (`true` / `false`) | Wraps text in ANSI foreground (default) or background color via titular's palette resolve[...]
 | **`style`** | Optional **`fg_color`**, **`bg_color`** | Like `color`, but explicit fg/bg strings; if neither is set, returns the input unchanged. |
 | **`surround`** | _none_ | If the value is not visually empty, wraps it with **`surround_start`** / **`surround_end`** from context (falling back to **`defaults.surround_*`**). |
-| **`append`** | **`text`** | Appends a literal after the value; skips append when the input or append text is “visually empty” (whitespace-only / ANSI-only). |
+| **`append`** | **`text`** | Appends a literal after the value; skips append when the input or append text is "visually empty" (whitespace-only / ANSI-only). |
 | **`pad`** | _none_ | Wraps the value in internal padding markers so the layout engine can align filler segments. |
 | **`hide`** | _none_ | If context **`hide`** is truthy (`true` / `1`), replaces the text with spaces of the same **visual** width (Unicode-aware); otherwise leaves it unchanged. |
-| **`markup`** (**`display`** only) | _none_ | Rich terminal markup after CLI **`-e`** escapes: line headings **`# `** / **`## `**, inline **`**bold**`**, **`__underline__`**, **`//italic//`**, with **`\`** to escape specials. |
+| **`markup`** (**`display`** only) | _none_ | Rich terminal markup after CLI **`-e`** escapes: line headings **`# `** / **`## `**, inline **`**bold**`**, **`__underline__`**, **`//italic//`**, w[...]
 
 ### Custom Tera function
 
@@ -166,7 +166,7 @@ Feature flags select optional dependencies and subcommands:
 | **`display`** | Syntax highlighting (Syntect), **`-T` / `--theme`**, fancy template preview modes, `templates list --themes`. |
 | **`display-themes`** | Same as enabling **`display`** (extended theme asset story). |
 | **`application`** | **Default**: **`minimal`** + **`fetcher`**. |
-| **`full_application`** | **`fetcher`** + **`display`** + **`bundler`** — “everything” for local builds. |
+| **`full_application`** | **`fetcher`** + **`display`** + **`bundler`** — "everything" for local builds. |
 
 Install examples:
 
@@ -191,9 +191,9 @@ Template directory override: **`TITULAR_TEMPLATES_DIR`** (otherwise `<config_dir
 
 ### Environment variables as default flags
 
-After the program name, titular expands a fixed set of environment variables into synthetic `--long=value` or flag tokens, then appends your real command-line arguments (same idea as [bat](https://github.com/sharkdp/bat)). **Explicit CLI flags win** over env-derived defaults.
+After the program name, titular expands a fixed set of environment variables into synthetic `--long=value` or flag tokens, then appends your real command-line arguments (same idea as [bat](https:[...]
 
-For each mapped variable, titular **does not inject** the corresponding flag if you already used it in the **global** argument list (everything before a `templates` subcommand). That avoids errors such as setting both `TITULAR_WIDTH=50` and `-w 60`. Env defaults still apply to runs like `titular templates list` when those flags are absent before `templates`.
+For each mapped variable, titular **does not inject** the corresponding flag if you already used it in the **global** argument list (everything before a `templates` subcommand). That avoids error[...]
 
 On Windows, argv is built with [`wild`](https://crates.io/crates/wild) so shell-style globs are expanded similarly to Unix.
 
