@@ -1,8 +1,10 @@
 # Titular (WIP)
 
-<p align="center">
-  <img src="logo.png" alt="Titular logo" />
-</p>
+<div align="center">
+
+![Titular logo](./logo.png)
+
+</div>
 
 A command-line tool to render configurable title lines in your terminal (ANSI styles, templates, optional syntax-highlighted preview).
 
